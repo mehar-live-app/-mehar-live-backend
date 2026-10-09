@@ -1,0 +1,14 @@
+node_modules/
+db.json
+db_*.json
+.jwt_secret
+.env
+*.backup
+*.backup_*
+*.before_*
+server_before_*.js
+patch_roles_v2.js
+secure_roles_patch.js
+
+server_launch_backup_*.js
+server.jsnode*
