@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mehar Live Prototype</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071d14;color:#fff;font-family:Arial,sans-serif}
+.app{max-width:430px;margin:auto;min-height:100vh;background:linear-gradient(#062017,#0b2b1d);position:relative;overflow:hidden}
+header{height:68px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;background:#061810;border-bottom:1px solid #b28a35}
+.logo{font-size:23px;font-weight:800;color:#f4d875}.tabs{display:flex;gap:24px;font-size:18px;font-weight:700}.tabs .active{color:#ffd94e;border-bottom:3px solid #ffd94e;padding-bottom:7px}
+.banner{margin:12px;border:2px solid #c89b42;border-radius:16px;padding:13px;background:linear-gradient(90deg,#063b29,#124c37);box-shadow:0 0 14px #000}
+.banner b{color:#ffe37c}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 12px}.card{height:105px;border:1px solid #c59b45;border-radius:14px;background:#0d3525;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;color:#ffe483}
+.rooms{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.room{height:150px;border-radius:16px;border:1px solid #b8934c;background:linear-gradient(135deg,#164f36,#062218);padding:10px;position:relative}.avatar{width:60px;height:60px;border-radius:50%;background:#5c765f;margin:auto;border:3px solid #e2bd56}.room h3{font-size:15px;text-align:center;margin:8px 0 3px}.room small{display:block;text-align:center;color:#c9d7c8}.hot{position:absolute;right:7px;top:7px;background:#e54d2f;padding:3px 7px;border-radius:9px;font-size:11px}
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);max-width:430px;width:100%;height:70px;background:#082217;border-top:1px solid #c39b4d;display:grid;grid-template-columns:repeat(4,1fr);z-index:20}.nav button{background:none;border:0;color:white;font-weight:700;font-size:13px}.nav button.active{color:#ffe16c}
+.screen{padding-bottom:80px}.roomScreen{min-height:100vh;background:radial-gradient(circle at 50% 25%,#1e4a35,#050e0b 70%);position:relative}.topPanel{padding:12px;display:flex;justify-content:space-between}.host{background:#073722;border:1px solid #c79e4e;border-radius:12px;padding:9px 12px}.seats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:35px 15px}.seat{text-align:center;font-size:12px}.seat .avatar{width:55px;height:55px}.roomActions{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:calc(100% - 20px);max-width:410px;background:#07301f;border:1px solid #c49a45;border-radius:25px;padding:8px;display:flex;gap:7px;z-index:30}.roomActions button{flex:1;border:0;border-radius:18px;padding:12px;background:#0c4a32;color:white;font-weight:800}.roomActions .giftBtn{background:#16b878}.giftPanel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#211d29;border-radius:24px 24px 0 0;padding:18px 14px 92px;z-index:40;display:none}.giftGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.gift{border:0;background:none;color:white;font-size:11px}.gift img{width:62px;height:62px;border-radius:12px;object-fit:cover;background:#333}.gift b{color:#78ffb9;display:block;margin-top:4px}.sendbar{margin-top:15px;display:flex;gap:8px}.sendbar input{width:70px;border-radius:18px;border:1px solid #c79e4e;background:#081b13;color:white;text-align:center}.sendbar button{flex:1;border:0;border-radius:18px;background:#18c98a;font-weight:800}.feed{position:absolute;bottom:90px;left:14px;right:14px}.giftEvent{background:rgba(8,42,29,.86);border:1px solid #d4a84d;border-radius:14px;padding:9px;margin:5px 0;animation:slide .35s ease}@keyframes slide{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
+.games{padding:15px}.gamegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.game{background:#0b3926;border:1px solid #8d7438;border-radius:13px;padding:8px;text-align:center;font-weight:700}.gameIcon{height:78px;border-radius:10px;background:linear-gradient(135deg,#245e46,#c18c35);display:flex;align-items:center;justify-content:center;font-size:27px}
+.profile{padding:20px}.profileBox{border:1px solid #c79d4d;border-radius:18px;padding:18px;background:#0a2c1d}.menu{margin-top:15px}.menu div{padding:17px 8px;border-bottom:1px solid #31513f;font-weight:700}
+</style>
+<script src="http://127.0.0.1:3000/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const gifts=[
+["🦁","Lion","100000"],["🐰","Rabbit","100"],["🧚","Fairy","300000"],["🏰","Castle","1000000"],
+["🧸","Teddy","500"],["🐥","Love Birds","1000"],["⛄","Snowman","3000"],["💐","Flower","5000"]
+];
+const games=["🎲 Ludo","🐪 Camel Racing","🍉 Fruit Blast","🎯 Big Eater","🏁 Speed Racing","🦖 Jurassic","🎣 Fishing","✊ Gesture War","🃏 PK Game"];
+function nav(){return `<nav class="nav">
+<button onclick="home()">🏠<br>Room</button><button onclick="gamesPage()">🎮<br>Games</button><button onclick="profile()">💬<br>Message</button><button onclick="profile()">👤<br>Me</button></nav>`}
+function home(){app.innerHTML=`<div class="screen"><header><div class="logo">MEHAR LIVE</div><div>🔍　🔔</div></header><div class="tabs"><span class="active">Hot</span><span>Mine</span></div>
+<div class="banner">👑 <b>Official Manager</b><br><small>Welcome to Mehar Live • ID: 10001</small></div>
+<div class="cards"><div class="card">💎<br>CP</div><div class="card">👨‍👩‍👧<br>Family</div><div class="card">🎙️<br>Rank</div></div>
+<h3 style="padding:0 12px;color:#ffe27b">🔥 Live Rooms</h3><div class="rooms">${["Raja","Mehar","Queen","King","Riya","Dark"].map((x,i)=>`<div class="room" onclick="room('${x}')"><span class="hot">LIVE</span><div class="avatar">👤</div><h3>${x}</h3><small>👥 ${(i+1)*1.2}K viewers</small></div>`).join("")}</div></div>${nav()}`}
+function room(name){app.innerHTML=`<div class="roomScreen"><div class="topPanel"><div class="host">👑 ${name}<br><small>ID:100${name.length}</small></div><div>↗　👥　✕</div></div><div class="seats">${Array.from({length:10},(_,i)=>`<div class="seat"><div class="avatar">👤</div>No.${i+1}</div>`).join("")}</div><div class="feed" id="feed"><div class="giftEvent">💬 Welcome everyone! Let's chat and have fun.</div></div>
+<div class="roomActions"><button onclick="mlOpenRoom();mlPanel('chat')">💬 Chat</button><button>🎤 Mic</button><button onclick="showGifts()">🎁 Gift</button><button>⚔️ PK</button></div>
+<div class="giftPanel" id="giftPanel"><h3>🎁 Gifts　　💎 CP　　🍀 Lucky Gift</h3><div class="giftGrid">${gifts.map((g,i)=>`<button class="gift" onclick="sendGift('${g[1]}','${g[2]}')"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='100%25' height='100%25' rx='15' fill='%23144b35'/%3E%3Ctext x='50%25' y='57%25' font-size='38' text-anchor='middle'%3E${encodeURIComponent(g[0])}%3C/text%3E%3C/svg%3E"><b>🪙 ${g[2]}</b>${g[1]}</button>`).join("")}</div><div class="sendbar"><input value="1" id="qty"><button onclick="closeGifts()">Close</button></div></div></div>`}
+function showGifts(){document.getElementById("giftPanel").style.display="block"}
+function closeGifts(){document.getElementById("giftPanel").style.display="none"}
+function sendGift(name,cost){closeGifts();let f=document.getElementById("feed");f.insertAdjacentHTML("afterbegin",`<div class="giftEvent">🎁 <b>You sent ${name}</b> — 🪙 ${cost} coins</div>`)}
+function gamesPage(){app.innerHTML=`<div class="screen"><header><div class="logo">MEHAR LIVE</div><div>🎮 Games</div></header><div class="games"><h2>🎮 Games</h2><div class="gamegrid">${games.map(g=>`<div class="game"><div class="gameIcon">${g.split(" ")[0]}</div>${g.substring(g.indexOf(" ")+1)}</div>`).join("")}</div></div>${nav()}`}
+function profile(){app.innerHTML=`<div class="screen profile"><h1>👤 Mehar</h1><div class="profileBox"><h2>Mehar</h2><div>ID: 117391</div><p>Visitors　6　 Following　3　 Followers　0</p></div><div class="menu">${["💎 VIP / SVIP","💰 Wallet","👨‍👩‍👧 Family","🏪 Store","🎒 Bag","❤️ CP","📈 Level","🎙️ Host Center","🏢 BD Center","⚙️ Settings"].map(x=>`<div>${x}　›</div>`).join("")}</div></div>${nav()}`}
+home();
+</script>
+<style>
+#mehar-frames-panel{font-family:Arial,sans-serif;color:#f7f1df;background:#10130f;padding:18px;border-radius:18px;margin:14px;display:none;position:relative;z-index:20}
+#mehar-frames-panel h2,#mehar-frames-panel h3{color:#f0cc72;margin:8px 0 12px}#mehar-frames-panel .mf-sub{color:#b8b8ad;font-size:13px;margin-bottom:14px}
+#mehar-frames-panel .mf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#mehar-frames-panel .mf-card{background:linear-gradient(145deg,#20231d,#12140f);border:1px solid #51472b;border-radius:16px;padding:13px;text-align:center}
+#mehar-frames-panel .mf-avatar{width:68px;height:68px;border-radius:50%;margin:4px auto 10px;display:flex;align-items:center;justify-content:center;background:#171717;font-weight:900;font-size:20px;border:4px solid #d6b35a;box-shadow:0 0 18px #d6b35a55}
+#mehar-frames-panel .mf-card p{font-size:12px;color:#c5c4b8;margin:5px 0 12px}#mehar-frames-panel button{background:#d6b35a;color:#17140b;border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}
+#mehar-frames-panel .mf-v2 .mf-avatar{border-color:#b88cff;box-shadow:0 0 18px #9c69ff66}#mehar-frames-panel .mf-v3 .mf-avatar{border-color:#ffe08a;box-shadow:0 0 20px #ffd76b88}#mehar-frames-panel .mf-v4 .mf-avatar{border-color:#b9ecff;box-shadow:0 0 20px #70cfff88}#mehar-frames-panel .mf-v5 .mf-avatar{border-color:#ffbf42;box-shadow:0 0 25px #ff853c99}#mehar-frames-panel .mf-admin .mf-avatar{border-color:#4da6ff;box-shadow:0 0 18px #308dff88}#mehar-frames-panel .mf-super .mf-avatar{border-color:#fff0a6;box-shadow:0 0 24px #ffd15c99}#mehar-frames-panel .mf-manager .mf-avatar{border-color:#48d99a;box-shadow:0 0 18px #21c77b88}
+#mehar-frames-panel .mf-assignment{margin-top:18px;padding:15px;border:1px solid #51472b;border-radius:16px;background:#191c16}#mehar-frames-panel select{background:#20231d;color:#fff;border:1px solid #625b42;border-radius:9px;padding:10px;margin:4px;max-width:100%}#mehar-frames-panel .mf-status{color:#f0cc72;margin-top:10px;font-size:13px}
+#mehar-frames-launch{position:fixed;right:14px;bottom:18px;z-index:99999;border:0;border-radius:24px;padding:13px 16px;background:linear-gradient(120deg,#f2d37a,#b88b32);color:#18130a;font-weight:800;box-shadow:0 5px 20px #0008}
+@media(min-width:650px){#mehar-frames-panel .mf-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+<section id="mehar-frames-panel"><button onclick="meharCloseFrames()" style="float:right">Close ✕</button><h2>MEHAR LIVE · FRAMES &amp; ROLES</h2><div class="mf-sub">Professional royal collection · English interface</div><div class="mf-grid">
+<div class="mf-card mf-v1"><div class="mf-avatar">V1</div><h3>VIP 1</h3><p>Classic Gold</p><button onclick="meharEquip('VIP 1')">Preview / Equip</button></div>
+<div class="mf-card mf-v2"><div class="mf-avatar">V2</div><h3>VIP 2</h3><p>Gold &amp; Purple</p><button onclick="meharEquip('VIP 2')">Preview / Equip</button></div>
+<div class="mf-card mf-v3"><div class="mf-avatar">V3</div><h3>VIP 3</h3><p>Royal Crown</p><button onclick="meharEquip('VIP 3')">Preview / Equip</button></div>
+<div class="mf-card mf-v4"><div class="mf-avatar">V4</div><h3>VIP 4</h3><p>Diamond Gold</p><button onclick="meharEquip('VIP 4')">Preview / Equip</button></div>
+<div class="mf-card mf-v5"><div class="mf-avatar">V5</div><h3>VIP 5</h3><p>Ultra Royal</p><button onclick="meharEquip('VIP 5')">Preview / Equip</button></div>
+<div class="mf-card mf-admin"><div class="mf-avatar">A</div><h3>Admin</h3><p>Blue Authority</p><button onclick="meharEquip('Admin')">Preview / Equip</button></div>
+<div class="mf-card mf-super"><div class="mf-avatar">SA</div><h3>Super Admin</h3><p>Black &amp; Gold Royal</p><button onclick="meharEquip('Super Admin')">Preview / Equip</button></div>
+<div class="mf-card mf-manager"><div class="mf-avatar">M</div><h3>Manager</h3><p>Emerald &amp; Gold</p><button onclick="meharEquip('Manager')">Preview / Equip</button></div></div>
+<div class="mf-assignment"><h3>Manager Role Assignment</h3><p class="mf-sub">Demo only: assignments are not saved to a real server and do not grant real permissions.</p><label for="mf-member">Member</label> <select id="mf-member"><option>Member 01</option><option>Member 02</option><option>Member 03</option></select> <label for="mf-role">Role / Frame</label> <select id="mf-role"><option>VIP 1</option><option>VIP 2</option><option>VIP 3</option><option>VIP 4</option><option>VIP 5</option><option>Admin</option><option>Super Admin</option><option>Manager</option></select> <button onclick="meharAssignRole()">Assign Role</button><div id="mf-status" class="mf-status">No demo assignment made yet.</div></div></section>
+<button id="mehar-frames-launch" onclick="meharOpenFrames()">👑 Frames &amp; Roles</button>
+<script>function meharOpenFrames(){var p=document.getElementById('mehar-frames-panel');p.style.display='block';p.scrollIntoView({behavior:'smooth',block:'start'});}function meharCloseFrames(){document.getElementById('mehar-frames-panel').style.display='none';}function meharEquip(n){try{localStorage.setItem('mehar_live_demo_frame',n);}catch(e){}alert(n+' frame selected for demo preview.');}function meharAssignRole(){var m=document.getElementById('mf-member').value,r=document.getElementById('mf-role').value;document.getElementById('mf-status').textContent=m+' → '+r+' assigned in this demo only.';}</script>
+
+
+<style>
+#mehar-economy{font-family:Arial,sans-serif;background:#10130f;color:#f5f1df;padding:18px;border-radius:18px;margin:14px;display:none}
+#mehar-economy h2,#mehar-economy h3{color:#f0cc72}
+.me-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.me-card{background:linear-gradient(145deg,#22251e,#12140f);border:1px solid #55492a;border-radius:16px;padding:14px;text-align:center}
+.me-card strong{font-size:18px;color:#f0cc72}.me-card p{font-size:12px;color:#bbb;margin:7px}
+.me-btn{background:#d6b35a;color:#15120a;border:0;border-radius:9px;padding:9px 12px;font-weight:800}
+.me-balance{padding:12px;border-radius:12px;background:#1b1e18;border:1px solid #51472b;margin-bottom:14px}
+.me-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}.me-tab{background:#25281f;color:#eee;border:1px solid #51472b;border-radius:9px;padding:8px 11px}
+.me-tab.active{background:#d6b35a;color:#15120a}
+.me-panel{display:none}.me-panel.active{display:block}
+.me-status{color:#f0cc72;font-size:13px;margin-top:10px}
+.me-input{background:#20231d;color:white;border:1px solid #625b42;border-radius:9px;padding:10px;width:90%;margin:5px 0}
+#mehar-economy-launch{position:fixed;right:14px;bottom:70px;z-index:99998;border:0;border-radius:24px;padding:13px 16px;background:linear-gradient(120deg,#f2d37a,#b88b32);color:#18130a;font-weight:800;box-shadow:0 5px 20px #0008}
+@media(min-width:650px){.me-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+
+<section id="mehar-economy" aria-label="Coins gifts diamonds and withdrawal">
+  <button class="me-btn" onclick="meharCloseEconomy()" style="float:right">Close ✕</button>
+  <h2>MEHAR LIVE · Coins, Gifts & Wallet</h2>
+  <div class="me-balance">
+    🪙 Coins: <b id="me-coins">0</b> &nbsp; | &nbsp;
+    💎 Diamonds: <b id="me-diamonds">0</b>
+  </div>
+  <div class="me-tabs">
+    <button class="me-tab active" onclick="meharTab('recharge',this)">Recharge</button>
+    <button class="me-tab" onclick="meharTab('gifts',this)">Gifts</button>
+    <button class="me-tab" onclick="meharTab('wallet',this)">Diamond Wallet</button>
+    <button class="me-tab" onclick="meharTab('withdraw',this)">Withdraw</button>
+  </div>
+
+  <div id="me-recharge" class="me-panel active">
+    <h3>Coin Recharge</h3>
+    <div class="me-grid">
+      <div class="me-card"><strong>1M Coins</strong><p>Demo price: $1</p><button class="me-btn" onclick="meharBuyCoins(1000000,1)">Buy</button></div>
+      <div class="me-card"><strong>5M Coins</strong><p>Demo price: $5</p><button class="me-btn" onclick="meharBuyCoins(5000000,5)">Buy</button></div>
+      <div class="me-card"><strong>10M Coins</strong><p>Demo price: $10</p><button class="me-btn" onclick="meharBuyCoins(10000000,10)">Buy</button></div>
+      <div class="me-card"><strong>50M Coins</strong><p>Demo price: $50</p><button class="me-btn" onclick="meharBuyCoins(50000000,50)">Buy</button></div>
+    </div>
+  </div>
+
+  <div id="me-gifts" class="me-panel">
+    <h3>Gift Shop</h3>
+    <div class="me-grid">
+      <div class="me-card"><strong>🌹 Rose</strong><p>1,000 Coins</p><button class="me-btn" onclick="meharSendGift('Rose',1000)">Send</button></div>
+      <div class="me-card"><strong>💎 Diamond</strong><p>10,000 Coins</p><button class="me-btn" onclick="meharSendGift('Diamond',10000)">Send</button></div>
+      <div class="me-card"><strong>🎁 Lucky Gift</strong><p>50,000 Coins</p><button class="me-btn" onclick="meharSendGift('Lucky Gift',50000)">Send</button></div>
+      <div class="me-card"><strong>🎬 Video Gift</strong><p>100,000 Coins</p><button class="me-btn" onclick="meharSendGift('Video Gift',100000)">Send</button></div>
+      <div class="me-card"><strong>🚀 Rocket</strong><p>500,000 Coins</p><button class="me-btn" onclick="meharSendGift('Rocket',500000)">Send</button></div>
+      <div class="me-card"><strong>👑 Royal Gift</strong><p>1,000,000 Coins</p><button class="me-btn" onclick="meharSendGift('Royal Gift',1000000)">Send</button></div>
+    </div>
+    <div id="me-gift-status" class="me-status">Choose a gift to send in this demo.</div>
+  </div>
+
+  <div id="me-wallet" class="me-panel">
+    <h3>Diamond Wallet</h3>
+    <p>Host earnings are represented as diamonds from received gifts.</p>
+    <div class="me-card"><strong id="me-wallet-diamonds">0 Diamonds</strong><p>Demo conversion: 2,000,000 Diamonds = $1</p></div>
+  </div>
+
+  <div id="me-withdraw" class="me-panel">
+    <h3>Withdraw Diamonds</h3>
+    <p>Demo rate: <b>2,000,000 Diamonds = $1</b>.</p>
+    <input id="me-withdraw-amount" class="me-input" type="number" min="1" placeholder="Enter diamonds to withdraw">
+    <br><button class="me-btn" onclick="meharWithdraw()">Request Withdrawal</button>
+    <div id="me-withdraw-status" class="me-status">No withdrawal request yet.</div>
+  </div>
+</section>
+<button id="mehar-economy-launch" onclick="meharOpenEconomy()">🪙 Coins & Gifts</button>
+
+<script>
+(function(){
+  let coins=Number(localStorage.getItem('mehar_demo_coins')||0);
+  let diamonds=Number(localStorage.getItem('mehar_demo_diamonds')||0);
+  window.meharRefreshBalances=function(){
+    document.getElementById('me-coins').textContent=coins.toLocaleString();
+    document.getElementById('me-diamonds').textContent=diamonds.toLocaleString();
+    document.getElementById('me-wallet-diamonds').textContent=diamonds.toLocaleString()+' Diamonds';
+  };
+  window.meharOpenEconomy=function(){document.getElementById('mehar-economy').style.display='block';meharRefreshBalances();document.getElementById('mehar-economy').scrollIntoView({behavior:'smooth'});};
+  window.meharCloseEconomy=function(){document.getElementById('mehar-economy').style.display='none';};
+  window.meharTab=function(id,btn){
+    document.querySelectorAll('#mehar-economy .me-panel').forEach(x=>x.classList.remove('active'));
+    document.getElementById('me-'+id).classList.add('active');
+    document.querySelectorAll('#mehar-economy .me-tab').forEach(x=>x.classList.remove('active'));
+    btn.classList.add('active');
+  };
+  window.meharBuyCoins=function(amount,dollars){
+    coins+=amount; localStorage.setItem('mehar_demo_coins',coins);
+    meharRefreshBalances(); alert('Demo purchase: '+amount.toLocaleString()+' Coins for $'+dollars);
+  };
+  window.meharSendGift=function(name,cost){
+    if(coins<cost){alert('Not enough demo Coins. Recharge first.');return;}
+    coins-=cost; diamonds+=Math.floor(cost/2);
+    localStorage.setItem('mehar_demo_coins',coins);
+    localStorage.setItem('mehar_demo_diamonds',diamonds);
+    meharRefreshBalances();
+    document.getElementById('me-gift-status').textContent=name+' sent for '+cost.toLocaleString()+' Coins. Demo Diamonds received: '+Math.floor(cost/2).toLocaleString()+'.';
+  };
+  window.meharWithdraw=function(){
+    const n=Number(document.getElementById('me-withdraw-amount').value||0);
+    const s=document.getElementById('me-withdraw-status');
+    if(n<=0){s.textContent='Enter a valid diamond amount.';return;}
+    if(n>diamonds){s.textContent='Insufficient demo Diamonds.';return;}
+    const usd=n/2000000;
+    diamonds-=n; localStorage.setItem('mehar_demo_diamonds',diamonds); meharRefreshBalances();
+    s.textContent='Demo withdrawal request: '+n.toLocaleString()+' Diamonds = $'+usd.toFixed(2)+'.';
+  };
+  document.addEventListener('DOMContentLoaded',meharRefreshBalances);
+})();
+</script>
+
+
+<style>
+#ml-room{display:none;font-family:Arial,sans-serif;background:#0b0e0b;color:#f7f1df;margin:14px;border-radius:20px;overflow:hidden;border:1px solid #51472b}
+.ml-top{padding:12px 14px;background:linear-gradient(100deg,#171b15,#282315);display:flex;justify-content:space-between;align-items:center}
+.ml-top b{color:#f0cc72}.ml-room-body{padding:14px}
+.ml-seats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
+.ml-seat{aspect-ratio:1;border-radius:50%;background:#1d211b;border:2px solid #51472b;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;text-align:center;box-shadow:0 0 12px #0008}
+.ml-seat.active{border-color:#d6b35a;color:#f0cc72}
+.ml-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:12px}
+.ml-actions button,.ml-close{background:#d6b35a;color:#15120a;border:0;border-radius:10px;padding:10px 5px;font-weight:800}
+.ml-panel{display:none;background:#171a15;border-top:1px solid #51472b;padding:12px}
+.ml-panel.active{display:block}
+.ml-gifts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ml-gift{background:#22251e;border:1px solid #51472b;border-radius:12px;padding:10px;text-align:center;color:#fff}
+.ml-gift small{display:block;color:#c7c2ad;margin:4px 0}
+.ml-activity{height:80px;overflow:auto;background:#11140f;border-radius:10px;padding:8px;font-size:12px;color:#e5d9b5}
+.ml-game-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.ml-game{padding:16px;background:#22251e;border:1px solid #51472b;border-radius:12px;text-align:center}
+.ml-status{color:#f0cc72;font-size:12px;margin-top:7px}
+#ml-room-launch{position:fixed;right:14px;bottom:122px;z-index:99997;background:linear-gradient(120deg,#f2d37a,#b88b32);color:#17130a;border:0;border-radius:24px;padding:13px 16px;font-weight:900;box-shadow:0 5px 20px #0008}
+@media(max-width:480px){.ml-actions{grid-template-columns:repeat(5,1fr)}.ml-actions button{font-size:11px}.ml-seats{gap:7px}.ml-gifts{grid-template-columns:repeat(2,1fr)}}
+.ml-seat{cursor:pointer!important;user-select:none!important}.ml-seat.active{cursor:pointer!important}.ml-top .ml-close{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:100000!important;min-width:58px!important;padding:10px 14px!important;background:#7b2929!important;color:#fff!important;border:1px solid #ff7777!important;border-radius:10px!important;font-weight:900!important;cursor:pointer!important}
+</style>
+
+<section id="ml-room">
+  <div class="ml-top"><div><b>MEHAR LIVE</b><br><small>Room #1001 · Live Room</small></div><button class="ml-close" onclick="mlCloseRoom()">Exit</button></div>
+  <div class="ml-room-body">
+    <div class="ml-activity" id="ml-activity">🎙️ Welcome to the room.<br></div>
+    <div class="ml-seats">
+      <div class="ml-seat active" onclick="meharSeatJoin(1)">👑<br>1</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(2)">2</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(3)">3</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(4)">4</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(5)">5</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(6)">6</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(7)">7</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(8)">8</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(9)">9</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(10)">10</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(11)">11</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(12)">12</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(13)">13</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(14)">14</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(15)">15</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(16)">16</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(17)">17</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(18)">18</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(19)">19</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(20)">20</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(21)">21</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(22)">22</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(23)">23</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(24)">24</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(25)">25</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(26)">26</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(27)">27</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(28)">28</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(29)">29</div>
+      <div class="ml-seat active" onclick="meharSeatJoin(30)">30</div>
+    </div>
+    <div class="ml-actions">
+      <button onclick="mlPanel('gift')">🎁 Gift</button>
+      <button onclick="mlPanel('game')">🎮 Games</button>
+      <button onclick="mlPanel('pk')">⚔️ PK</button>
+      <button onclick="mlPanel('chat')">💬 Chat</button>
+      <button onclick="mlPanel('more')">••• More</button>
+    </div>
+
+    <div id="ml-gift" class="ml-panel">
+      <h3>Room Gifts</h3>
+      <div class="ml-gifts">
+        <button class="ml-gift" onclick="mlSendGift('Rose',1000)">🌹<small>Rose · 1K</small>Send</button>
+        <button class="ml-gift" onclick="mlSendGift('Heart',10000)">❤️<small>Heart · 10K</small>Send</button>
+        <button class="ml-gift" onclick="mlSendGift('Lucky Gift',50000)">🍀<small>Lucky · 50K</small>Send</button>
+        <button class="ml-gift" onclick="mlSendGift('Video Gift',100000)">🎬<small>Video · 100K</small>Send</button>
+        <button class="ml-gift" onclick="mlSendGift('Rocket',500000)">🚀<small>Rocket · 500K</small>Send</button>
+        <button class="ml-gift" onclick="mlSendGift('Royal Gift',1000000)">👑<small>Royal · 1M</small>Send</button>
+      </div>
+      <div class="ml-status" id="ml-gift-status">Choose a gift. Coins and Diamonds are demo balances.</div>
+    </div>
+
+    <div id="ml-game" class="ml-panel">
+      <h3>Games in Room</h3>
+      <div class="ml-game-grid">
+        <button class="ml-game" onclick="mlStartGame('Lucky Wheel')">🎡<br><b>Lucky Wheel</b></button>
+        <button class="ml-game" onclick="mlStartGame('Dice')">🎲<br><b>Dice</b></button>
+        <button class="ml-game" onclick="mlStartGame('Cards')">🃏<br><b>Cards</b></button>
+        <button class="ml-game" onclick="mlStartGame('Mini Game')">🎮<br><b>Mini Game</b></button>
+      </div>
+      <div class="ml-status" id="ml-game-status">Games open inside the live room.</div>
+    </div>
+
+    <div id="ml-pk" class="ml-panel"><h3>⚔️ PK Battle</h3><p>Invite another room and start a demo PK battle.</p><button class="ml-close" onclick="mlPk()">Start PK</button><div class="ml-status" id="ml-pk-status"></div></div>
+    <div id="ml-users" style="margin:8px 0;padding:8px;border-radius:10px;background:#1b1e18;color:#f7f1df">👥 Online Users: <span id="ml-users-count">0</span><div id="ml-users-list" style="margin-top:6px"></div></div><div id="ml-chat" class="ml-panel"><h3>💬 Room Chat</h3><input id="ml-chat-input" placeholder="Type a message..." style="width:90%;padding:10px;border-radius:9px;border:1px solid #51472b;background:#22251e;color:#fff"><button class="ml-close" onclick="mlChat()">Send</button></div>
+    <div id="ml-more" class="ml-panel"><h3>More</h3><p>Mic · Mute · Room Settings · Share · Report</p></div>
+  </div>
+</section>
+<button id="ml-room-launch" onclick="mlOpenRoom()">🎙️ Open Live Room</button>
+
+<script>
+(function(){
+  function get(n){return Number(localStorage.getItem(n)||0)}
+  function set(n,v){localStorage.setItem(n,v)}
+  window.mlOpenRoom=function(){
+    document.getElementById('ml-room').style.display='block';
+    mlPanel('gift');
+    window.meharRoomConnect();
+    document.getElementById('ml-room').scrollIntoView({behavior:'smooth'});
+  }
+  window.mlCloseRoom=function(){
+    let old=document.getElementById('meharRoomExitMenu');
+    if(old){old.remove();return;}
+
+    const menu=document.createElement('div');
+    menu.id='meharRoomExitMenu';
+    menu.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:flex-end;justify-content:center;padding:18px';
+
+    menu.innerHTML=`<div style="width:100%;max-width:360px;background:#11140f;border:1px solid #d4aa4f;border-radius:18px;padding:16px;color:#fff;box-shadow:0 15px 50px #000">
+      <div style="font-size:16px;font-weight:900;color:#f5d36f;margin-bottom:12px">Room Options</div>
+      <button id="mlMinimizeRoom" style="width:100%;padding:14px;margin:5px 0;border:0;border-radius:12px;background:#d4aa4f;color:#17130a;font-weight:900">⌄ Minimize Room</button>
+      <button id="mlExitRoom" style="width:100%;padding:14px;margin:5px 0;border:1px solid #ff6666;border-radius:12px;background:#642b2b;color:#fff;font-weight:900">✕ Exit Room</button>
+      <button id="mlCancelRoom" style="width:100%;padding:11px;margin-top:5px;border:0;border-radius:12px;background:#292d28;color:#fff">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(menu);
+
+    document.getElementById('mlMinimizeRoom').onclick=()=>{
+      menu.remove();
+      document.getElementById('ml-room').style.display='none';
+    };
+
+    document.getElementById('mlExitRoom').onclick=()=>{
+      if(window.meharRoomSocket){
+        window.meharRoomSocket.emit('seat:leave',{roomId:'1001'});
+      }
+      menu.remove();
+      document.getElementById('ml-room').style.display='none';
+    };
+
+    document.getElementById('mlCancelRoom').onclick=()=>{
+      menu.remove();
+    };
+  }
+  window.mlPanel=function(id){document.querySelectorAll('#ml-room .ml-panel').forEach(x=>x.classList.remove('active'));document.getElementById('ml-'+id).classList.add('active')}
+  window.mlSendGift=function(name,cost){
+    let coins=get('mehar_demo_coins'), diamonds=get('mehar_demo_diamonds');
+    if(coins<cost){document.getElementById('ml-gift-status').textContent='Not enough Coins. Open Coins & Gifts to recharge.';return}
+    coins-=cost; diamonds+=Math.floor(cost/2); set('mehar_demo_coins',coins);set('mehar_demo_diamonds',diamonds);
+    const a=document.getElementById('ml-activity');a.innerHTML='🎁 You sent <b>'+name+'</b> · '+cost.toLocaleString()+' Coins<br>'+a.innerHTML;
+    document.getElementById('ml-gift-status').textContent=name+' sent successfully. Demo Diamonds +'+Math.floor(cost/2).toLocaleString();
+    if(name==='Rocket'){a.innerHTML='🚀 <b>ROCKET GIFT!</b> You sent Rocket · '+cost.toLocaleString()+' Coins<br>'+a.innerHTML}
+  }
+  window.mlStartGame=function(name){document.getElementById('ml-game-status').textContent=name+' started inside this room (demo).';document.getElementById('ml-activity').innerHTML='🎮 <b>'+name+'</b> started in the room.<br>'+document.getElementById('ml-activity').innerHTML}
+  window.mlPk=function(){document.getElementById('ml-pk-status').textContent='PK invitation sent (demo).'}
+  window.meharRoomSocket=null;
+  window.meharSeatJoin=function(seatNumber){
+  const msg=document.getElementById('seatMessage');
+  if(!window.meharRoomSocket){
+    if(msg) msg.textContent='Room is not connected yet.';
+    return;
+  }
+  if(msg) msg.textContent='Joining Seat '+seatNumber+'...';
+  window.meharRoomSocket.emit('seat:join',{
+    roomId:'1001',
+    seatNumber:Number(seatNumber)
+  });
+};
+
+window.meharRoomConnect=function(){
+    if(typeof io==='undefined'){console.log('Socket.IO client not loaded');return;}
+    if(window.meharRoomSocket)return;
+    const socket=io('http://127.0.0.1:3000',{auth:{token:window.meharBackend?.state?.token}});
+    window.meharRoomSocket=socket;
+    socket.on('connect',()=>{const u=window.meharBackend?.state?.user;socket.emit('room:join',{roomId:'1001'});});
+    socket.on('room:chat',data=>{
+      const a=document.getElementById('ml-activity');
+      if(a)a.innerHTML='💬 <b>'+String(data.name||data.userId||'User')+':</b> '+String(data.message||'')+'<br>'+a.innerHTML;
+    });
+    socket.on('room:system',data=>{
+      const a=document.getElementById('ml-activity');
+      if(a)a.innerHTML='ℹ️ '+String(data.message||'')+'<br>'+a.innerHTML;
+    });
+    socket.on('room:seats',seats=>{
+      console.log('Room seats:',seats);
+
+      document.querySelectorAll('#seatGrid > div').forEach((d,i)=>{
+        const seatNumber=i+1;
+        const occupant=seats.find(x=>Number(x.seatNumber)===seatNumber);
+
+        if([10,20,30].includes(seatNumber)){
+          const roomSeats=document.querySelectorAll('#ml-room .ml-seat');
+          const roomSeat=[...roomSeats].find(d=>d.textContent.includes(String(seatNumber)));
+          if(roomSeat){
+            roomSeat.style.border=occupant?'2px solid #18c98a':'';
+            roomSeat.style.cursor='pointer';
+          }
+        }
+        const label=d.querySelector('div:last-child');
+        if(occupant){
+          d.innerHTML='<div style="font-size:18px">👤</div><div>Seat '+seatNumber+'</div><div style="font-size:10px;color:#78ffb9">'+String(occupant.userId||'User')+'</div>';
+          d.style.border='1px solid #18c98a';
+        }
+      });
+    });
+
+    socket.on('seat:error',data=>{
+      const msg=document.getElementById('seatMessage');
+      if(msg)msg.textContent=String(data?.message||'Seat error');
+    });
+
+    socket.on('room:users',users=>{
+      console.log('Online users:',users);
+      const count=document.getElementById('ml-users-count');
+      const list=document.getElementById('ml-users-list');
+      if(count)count.textContent=users.length;
+      if(list)list.innerHTML=users.map(u=>'👤 '+String(u.name||'User')+' <small style="color:#78ffb9">('+String(u.userId||u.id||'ID')+')</small>').join('<br>');
+      const a=document.getElementById('ml-activity');
+      if(a)a.innerHTML='👥 Online: '+users.length+'<br>'+a.innerHTML;
+    });
+  };
+  window.mlChat=function(){
+    let i=document.getElementById('ml-chat-input');
+    let msg=i.value.trim();
+    if(!msg)return;
+    if(window.meharRoomSocket){
+      window.meharRoomSocket.emit('room:chat',{roomId:'1001',message:msg});
+    }else{
+      document.getElementById('ml-activity').innerHTML='💬 You: '+msg+'<br>'+document.getElementById('ml-activity').innerHTML;
+    }
+    i.value='';
+  }
+})();
+</script>
+
+
+<style>
+#ml-seller{display:none;font-family:Arial,sans-serif;background:#10130f;color:#f7f1df;margin:14px;padding:18px;border-radius:18px;border:1px solid #51472b}
+#ml-seller h2,#ml-seller h3{color:#f0cc72}.seller-card{background:#1b1e18;border:1px solid #51472b;border-radius:14px;padding:14px;margin:10px 0}
+.seller-row{display:flex;gap:8px;flex-wrap:wrap}.seller-row input,.seller-row select{background:#22251e;color:#fff;border:1px solid #625b42;border-radius:9px;padding:10px}
+.seller-btn{background:#d6b35a;color:#17130a;border:0;border-radius:9px;padding:10px 14px;font-weight:800}
+.seller-status{color:#f0cc72;font-size:13px;margin-top:10px}
+#ml-seller-launch{position:fixed;right:14px;bottom:174px;z-index:99996;background:linear-gradient(120deg,#f2d37a,#b88b32);color:#17130a;border:0;border-radius:24px;padding:13px 16px;font-weight:900;box-shadow:0 5px 20px #0008}
+</style>
+<section id="ml-seller">
+<button class="seller-btn" onclick="mlCloseSeller()" style="float:right">Close ✕</button>
+<h2>MEHAR LIVE · Coin Seller</h2>
+<div class="seller-card">
+<h3>Verified Coin Sellers</h3>
+<select id="seller-id">
+<option value="SELLER1001">SELLER1001 · Verified</option>
+<option value="SELLER1002">SELLER1002 · Verified</option>
+<option value="SELLER1003">SELLER1003 · Verified</option>
+</select>
+</div>
+<div class="seller-card">
+<h3>Withdraw Diamonds to Seller</h3>
+<p>Demo rate: <b>2,000,000 Diamonds = $1</b></p>
+<div class="seller-row">
+<input id="seller-diamonds" type="number" min="1" placeholder="Diamonds amount">
+<button class="seller-btn" onclick="mlSendDiamondsToSeller()">Send to Seller</button>
+</div>
+<div id="seller-status" class="seller-status">Select a seller and enter the Diamond amount.</div>
+</div>
+<div class="seller-card">
+<h3>Seller Transaction History</h3>
+<div id="seller-history">No transactions yet.</div>
+</div>
+</section>
+<button id="ml-seller-launch" onclick="mlOpenSeller()">💎 Seller Withdrawal</button>
+<script>
+(function(){
+window.mlOpenSeller=function(){document.getElementById('ml-seller').style.display='block';document.getElementById('ml-seller').scrollIntoView({behavior:'smooth'});};
+window.mlCloseSeller=function(){document.getElementById('ml-seller').style.display='none';};
+window.mlSendDiamondsToSeller=function(){
+ const amount=Number(document.getElementById('seller-diamonds').value||0);
+ const seller=document.getElementById('seller-id').value;
+ const status=document.getElementById('seller-status');
+ let diamonds=Number(localStorage.getItem('mehar_demo_diamonds')||0);
+ if(amount<=0){status.textContent='Enter a valid Diamond amount.';return;}
+ if(amount>diamonds){status.textContent='Insufficient Diamonds.';return;}
+ diamonds-=amount; localStorage.setItem('mehar_demo_diamonds',diamonds);
+ const usd=amount/2000000;
+ const item=document.createElement('div');
+ item.textContent=new Date().toLocaleString()+' · '+seller+' · '+amount.toLocaleString()+' Diamonds · $'+usd.toFixed(2);
+ const hist=document.getElementById('seller-history');
+ if(hist.textContent==='No transactions yet.') hist.textContent='';
+ hist.prepend(item);
+ status.textContent='Withdrawal sent successfully to '+seller+' (demo). Value: $'+usd.toFixed(2);
+};
+})();
+</script>
+
+
+<section id="seatSystem" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#15151d,#241d10);border:1px solid #6d5725;color:#fff">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:20px;font-weight:800">Room Seats</div>
+      <div id="seatStatus" style="opacity:.8;font-size:13px">10 seats unlocked</div>
+    </div>
+    <div id="seatOwnerBadge" style="font-size:11px;padding:6px 9px;border-radius:99px;background:#3b2a08;color:#ffd76a">ROOM OWNER</div>
+  </div>
+  <div id="seatGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+    <button id="unlock20" style="padding:10px 14px;border:0;border-radius:10px;background:#d9a72c;color:#111;font-weight:800">Unlock 20 Seats · 500K</button>
+    <button id="unlock30" style="padding:10px 14px;border:0;border-radius:10px;background:#8f6ad8;color:#fff;font-weight:800">Unlock 30 Seats · 500K</button>
+  </div>
+  <div id="seatMessage" style="margin-top:10px;font-size:12px;opacity:.85"></div>
+</section>
+<script>
+(function(){
+  const CAP_KEY='mehar_room_capacity_server';
+  let cap=Number(localStorage.getItem(CAP_KEY)||10);
+  const grid=document.getElementById('seatGrid');
+  const status=document.getElementById('seatStatus');
+  const msg=document.getElementById('seatMessage');
+
+  function fmt(n){return new Intl.NumberFormat('en-US').format(Number(n||0));}
+
+  async function loadCapacity(retry=0){
+    try{
+      const backend=window.meharBackend;
+      const st=backend?.state;
+
+      if(!st?.token){
+        if(retry<20){
+          setTimeout(()=>loadCapacity(retry+1),500);
+          return;
+        }
+        status.textContent='Please login to the server first.';
+        return;
+      }
+
+      const d=await backend.api('/rooms/1001/capacity');
+      cap=Number(d.capacity||10);
+      localStorage.setItem(CAP_KEY,String(cap));
+      render();
+    }catch(e){
+      msg.textContent='Seat capacity load failed: '+e.message;
+    }
+  }
+
+  function render(){
+    status.textContent=cap+' seats unlocked · Server wallet';
+    grid.innerHTML='';
+
+    for(let i=1;i<=30;i++){
+      const unlocked=i<=cap;
+      const d=document.createElement('div');
+
+      d.style.cssText='min-height:58px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;border:1px solid '+(unlocked?'#665326':'#30303a')+';background:'+(unlocked?'rgba(255,190,50,.08)':'rgba(255,255,255,.025)')+';color:'+(unlocked?'#f7d477':'#777');
+
+      d.innerHTML='<div style="font-size:18px">'+(unlocked?'◉':'🔒')+'</div><div>Seat '+i+'</div>';
+      grid.appendChild(d);
+    }
+
+    document.getElementById('unlock20').disabled=cap>=20;
+    document.getElementById('unlock30').disabled=cap>=30;
+
+    ['unlock20','unlock30'].forEach(id=>{
+      const b=document.getElementById(id);
+      b.style.opacity=b.disabled?.5:1;
+      b.style.cursor=b.disabled?'not-allowed':'pointer';
+    });
+  }
+
+  async function unlock(target){
+    const s=window.meharBackend?.state;
+
+    if(!s?.token){
+      msg.textContent='Please login to the server first.';
+      window.meharBackend?.showAuth();
+      return;
+    }
+
+    if(cap>=target){
+      msg.textContent='This seat level is already unlocked.';
+      return;
+    }
+
+    try{
+      msg.textContent='Unlocking '+target+' seats on server...';
+
+      const d=await window.meharBackend.api('/rooms/1001/unlock-seats',{
+        method:'POST',
+        body:JSON.stringify({target})
+      });
+
+      cap=Number(d.capacity||target);
+      localStorage.setItem(CAP_KEY,String(cap));
+
+      msg.textContent='Success: '+target+' seats unlocked. 500,000 coins deducted from server wallet.';
+      render();
+    }catch(e){
+      msg.textContent='Seat unlock failed: '+e.message;
+    }
+  }
+
+  document.getElementById('unlock20').onclick=()=>unlock(20);
+  document.getElementById('unlock30').onclick=()=>unlock(30);
+
+  render();
+  window.addEventListener('load',()=>setTimeout(loadCapacity,700));
+  setTimeout(loadCapacity,1200);
+})();
+</script>
+  document.getElementById('unlock30').onclick=()=>unlock(30);
+
+  render();
+  window.addEventListener('load',()=>setTimeout(loadCapacity,700));
+  setTimeout(loadCapacity,1200);
+</script>
+
+
+<section id="pkGiftSystem" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#101522,#211225);border:1px solid #62445f;color:#fff">
+  <div style="font-size:20px;font-weight:800">Live Gift & PK Battle</div>
+  <div style="font-size:12px;opacity:.75;margin-top:3px">Demo room controls</div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+    <button id="giftRose" style="padding:10px 13px;border:0;border-radius:10px;font-weight:800">🌹 Rose · 1K</button>
+    <button id="giftLucky" style="padding:10px 13px;border:0;border-radius:10px;font-weight:800">🎁 Lucky · 50K</button>
+    <button id="giftRocket" style="padding:10px 13px;border:0;border-radius:10px;background:#d99b27;color:#111;font-weight:900">🚀 Rocket · 500K</button>
+  </div>
+
+  <div id="giftStage" style="position:relative;height:105px;margin-top:14px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center">
+    <div id="giftEffect" style="font-size:24px;font-weight:900"></div>
+  </div>
+  <div id="giftFeed" style="margin-top:10px;font-size:12px;line-height:1.7;max-height:100px;overflow:auto"></div>
+
+  <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,.1);padding-top:15px">
+    <div style="font-size:18px;font-weight:800">⚔️ PK Battle</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+      <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.05)">
+        <b>Mehar Host</b><div id="pkA" style="font-size:24px;margin-top:5px">0</div>
+      </div>
+      <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.05)">
+        <b>Guest Host</b><div id="pkB" style="font-size:24px;margin-top:5px">0</div>
+      </div>
+    </div>
+    <div style="height:12px;background:#292936;border-radius:99px;margin-top:10px;overflow:hidden">
+      <div id="pkBar" style="height:100%;width:50%;background:linear-gradient(90deg,#d9a72c,#8f6ad8);transition:width .4s"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button id="pkStart" style="padding:10px 13px;border:0;border-radius:10px;background:#7c4dff;color:white;font-weight:800">Start PK</button>
+      <button id="pkGiftA" style="padding:10px 13px;border:0;border-radius:10px">Gift Mehar +100K</button>
+      <button id="pkGiftB" style="padding:10px 13px;border:0;border-radius:10px">Gift Guest +100K</button>
+    </div>
+    <div id="pkStatus" style="font-size:12px;opacity:.8;margin-top:9px">PK not started</div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const COIN_KEY='mehar_demo_coins';
+  let coins=parseInt(localStorage.getItem(COIN_KEY)||'10000000',10);
+  let a=0,b=0,active=false;
+  const effect=document.getElementById('giftEffect');
+  const feed=document.getElementById('giftFeed');
+
+  function fmt(n){return new Intl.NumberFormat('en-US').format(n);}
+  function addFeed(t){
+    const row=document.createElement('div');
+    row.innerHTML='✨ '+t;
+    feed.prepend(row);
+  }
+  function gift(name,cost,emoji,rocket=false){
+    if(coins<cost){
+      addFeed('Not enough demo coins.');
+      return;
+    }
+    coins-=cost;
+    localStorage.setItem(COIN_KEY,String(coins));
+    effect.textContent=emoji+' '+name+' sent! -'+fmt(cost)+' coins';
+    effect.style.transform='scale(.7)';
+    effect.style.opacity='0';
+    setTimeout(()=>{effect.style.transition='all .45s';effect.style.transform='scale(1.15)';effect.style.opacity='1';},30);
+    if(rocket){
+      effect.textContent='🚀🚀 ROCKET LAUNCHED! 🚀🚀';
+      addFeed('<b>Mehar Host</b> sent a <b>Rocket</b> · 500K coins');
+    }else addFeed('<b>Mehar Host</b> sent '+name+' · '+fmt(cost)+' coins');
+    if(active){a+=Math.floor(cost/1000); renderPK();}
+  }
+  document.getElementById('giftRose').onclick=()=>gift('Rose',1000,'🌹');
+  document.getElementById('giftLucky').onclick=()=>gift('Lucky Gift',50000,'🎁');
+  document.getElementById('giftRocket').onclick=()=>gift('Rocket',500000,'🚀',true);
+
+  function renderPK(){
+    document.getElementById('pkA').textContent=fmt(a)+'K';
+    document.getElementById('pkB').textContent=fmt(b)+'K';
+    const total=a+b||1;
+    document.getElementById('pkBar').style.width=(a/total*100)+'%';
+  }
+  document.getElementById('pkStart').onclick=()=>{
+    active=true;a=0;b=0;renderPK();
+    document.getElementById('pkStatus').textContent='🔥 PK is LIVE — send gifts to score points!';
+  };
+  document.getElementById('pkGiftA').onclick=()=>{
+    if(!active)return;
+    a+=100;renderPK();document.getElementById('pkStatus').textContent='Mehar Host received +100K PK points';
+  };
+  document.getElementById('pkGiftB').onclick=()=>{
+    if(!active)return;
+    b+=100;renderPK();document.getElementById('pkStatus').textContent='Guest Host received +100K PK points';
+  };
+  renderPK();
+})();
+</script>
+
+
+<section id="hostCenterSystem" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#10151b,#172a24);border:1px solid #3d725c;color:#fff">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:21px;font-weight:900">Host Center</div>
+      <div style="font-size:12px;opacity:.72">Agency membership & host earnings</div>
+    </div>
+    <div id="agencyBadge" style="padding:7px 10px;border-radius:99px;background:#173d2b;color:#74e0a8;font-size:11px;font-weight:800">NO AGENCY</div>
+  </div>
+
+  <div style="margin-top:15px;padding:13px;border-radius:14px;background:rgba(255,255,255,.05)">
+    <div style="font-size:13px;opacity:.7">Host</div>
+    <div style="font-size:18px;font-weight:800">Mehar Host</div>
+    <div id="agencyName" style="margin-top:5px;font-size:13px;color:#9de8bf">Not joined to an agency</div>
+  </div>
+
+  <div style="margin-top:15px">
+    <div style="font-size:17px;font-weight:800">Agency Requests</div>
+    <div id="agencyRequests" style="margin-top:9px"></div>
+  </div>
+
+  <div style="margin-top:15px;padding:13px;border-radius:14px;background:rgba(255,255,255,.05)">
+    <div style="font-size:17px;font-weight:800">Host Earnings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <div><div style="font-size:11px;opacity:.65">Diamonds</div><div id="hostDiamonds" style="font-size:22px;font-weight:900">0</div></div>
+      <div><div style="font-size:11px;opacity:.65">Agency status</div><div id="earningStatus" style="font-size:14px;font-weight:800">Agency required</div></div>
+    </div>
+    <div id="earningNote" style="margin-top:9px;font-size:12px;opacity:.72">
+      Join an agency to activate host earning in this prototype.
+    </div>
+  </div>
+
+  <div style="margin-top:15px">
+    <button id="demoRequest" style="padding:11px 14px;border:0;border-radius:10px;background:#d9a72c;color:#111;font-weight:900">
+      Demo: Receive Agency Request
+    </button>
+    <button id="leaveAgency" style="padding:11px 14px;border:0;border-radius:10px;background:#333;color:#fff;font-weight:800;margin-left:6px">
+      Leave Agency
+    </button>
+  </div>
+  <div id="agencyMessage" style="margin-top:10px;font-size:12px;opacity:.8"></div>
+</section>
+
+<script>
+(function(){
+  const AKEY='mehar_host_agency';
+  const RKEY='mehar_agency_requests';
+  const DKEY='mehar_demo_diamonds';
+
+  let agency=localStorage.getItem(AKEY)||'';
+  let requests=JSON.parse(localStorage.getItem(RKEY)||'[]');
+  let diamonds=parseInt(localStorage.getItem(DKEY)||'0',10);
+
+  const requestsBox=document.getElementById('agencyRequests');
+  const badge=document.getElementById('agencyBadge');
+  const name=document.getElementById('agencyName');
+  const status=document.getElementById('earningStatus');
+  const note=document.getElementById('earningNote');
+  const msg=document.getElementById('agencyMessage');
+
+  function render(){
+    if(agency){
+      badge.textContent='AGENCY JOINED';
+      badge.style.background='#17452f';
+      badge.style.color='#8af0b8';
+      name.textContent='Agency: '+agency;
+      status.textContent='Earning Active';
+      status.style.color='#74e0a8';
+      note.textContent='You can earn through live hosting and gifts while joined to this agency.';
+    }else{
+      badge.textContent='NO AGENCY';
+      badge.style.background='#3d2b18';
+      badge.style.color='#ffd27a';
+      name.textContent='Not joined to an agency';
+      status.textContent='Agency required';
+      status.style.color='#ffd27a';
+      note.textContent='Join an agency to activate host earning in this prototype.';
+    }
+    document.getElementById('hostDiamonds').textContent=new Intl.NumberFormat('en-US').format(diamonds);
+
+    requestsBox.innerHTML='';
+    if(!requests.length){
+      requestsBox.innerHTML='<div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:12px;opacity:.7">No pending agency requests.</div>';
+    }else{
+      requests.forEach((r,i)=>{
+        const card=document.createElement('div');
+        card.style.cssText='padding:12px;border-radius:13px;background:rgba(255,255,255,.05);margin-top:7px';
+        card.innerHTML='<div style="font-weight:900">'+r.agency+'</div><div style="font-size:12px;opacity:.7;margin-top:3px">Agency wants you to join as a host.</div>'+
+          '<div style="margin-top:9px"><button data-a="'+i+'" style="padding:8px 11px;border:0;border-radius:8px;background:#38a169;color:white;font-weight:800">Agree</button>'+
+          '<button data-r="'+i+'" style="padding:8px 11px;border:0;border-radius:8px;background:#333;color:white;font-weight:800;margin-left:6px">Reject</button></div>';
+        requestsBox.appendChild(card);
+      });
+    }
+    localStorage.setItem(AKEY,agency);
+    localStorage.setItem(RKEY,JSON.stringify(requests));
+    localStorage.setItem(DKEY,String(diamonds));
+  }
+
+  requestsBox.addEventListener('click',e=>{
+    if(e.target.dataset.a!==undefined){
+      const i=+e.target.dataset.a;
+      agency=requests[i].agency;
+      requests.splice(i,1);
+      msg.textContent='Request accepted. You joined '+agency+'. Host earning is now active.';
+      render();
+    }
+    if(e.target.dataset.r!==undefined){
+      const i=+e.target.dataset.r;
+      const rejected=requests[i].agency;
+      requests.splice(i,1);
+      msg.textContent='Request from '+rejected+' rejected.';
+      render();
+    }
+  });
+
+  document.getElementById('demoRequest').onclick=()=>{
+    if(agency){msg.textContent='Leave your current agency before accepting another request.';return;}
+    requests.push({agency:'Mehar Royal Agency',time:Date.now()});
+    msg.textContent='New agency request received in Host Center.';
+    render();
+  };
+
+  document.getElementById('leaveAgency').onclick=()=>{
+    if(!agency){msg.textContent='You are not currently in an agency.';return;}
+    const old=agency; agency='';
+    msg.textContent='You left '+old+'. Host earning is inactive until you join an agency again.';
+    render();
+  };
+
+  render();
+})();
+</script>
+
+
+<section id="agencyOwnerPanel" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#17111e,#121c28);border:1px solid #5b4b79;color:#fff">
+  <div style="font-size:21px;font-weight:900">Agency Owner Center</div>
+  <div style="font-size:12px;opacity:.7">Host management & agency requests</div>
+
+  <div style="margin-top:14px;padding:13px;border-radius:14px;background:rgba(255,255,255,.05)">
+    <div style="font-size:12px;opacity:.65">Your Agency</div>
+    <div style="font-size:19px;font-weight:900">Mehar Royal Agency</div>
+    <div id="agencyHostCount" style="margin-top:4px;font-size:12px;opacity:.75">0 hosts joined</div>
+  </div>
+
+  <div style="margin-top:14px;font-size:17px;font-weight:800">Find Host</div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <input id="hostIdInput" placeholder="Enter Host ID" style="flex:1;padding:11px;border-radius:10px;border:1px solid #444;background:#101016;color:#fff">
+    <button id="sendAgencyReq" style="padding:11px 14px;border:0;border-radius:10px;background:#d9a72c;color:#111;font-weight:900">Send Request</button>
+  </div>
+  <div id="agencyOwnerMsg" style="margin-top:9px;font-size:12px;opacity:.8"></div>
+
+  <div style="margin-top:17px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">
+    <div style="font-size:17px;font-weight:800">Agency Hosts</div>
+    <div id="agencyHosts" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<section id="hostWithdraw" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#101c18,#171712);border:1px solid #486d55;color:#fff">
+  <div style="font-size:21px;font-weight:900">Host Center · Withdrawal</div>
+  <div style="font-size:12px;opacity:.7;margin-top:3px">Withdrawal is available inside Host Center</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px">
+    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.05)">
+      <div style="font-size:11px;opacity:.65">Available Diamonds</div>
+      <div id="wdDiamonds" style="font-size:21px;font-weight:900">0</div>
+    </div>
+    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.05)">
+      <div style="font-size:11px;opacity:.65">Rate</div>
+      <div style="font-size:17px;font-weight:900">2M = $1</div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <select id="sellerSelect" style="width:100%;padding:11px;border-radius:10px;background:#101016;color:#fff;border:1px solid #444">
+      <option value="">Select Coin Seller ID</option>
+      <option>SELLER1001</option>
+      <option>SELLER1002</option>
+      <option>SELLER1003</option>
+    </select>
+    <input id="wdAmount" type="number" min="1" placeholder="Enter Diamonds" style="width:100%;box-sizing:border-box;margin-top:8px;padding:11px;border-radius:10px;border:1px solid #444;background:#101016;color:#fff">
+    <button id="withdrawBtn" style="width:100%;margin-top:8px;padding:12px;border:0;border-radius:10px;background:#39a96b;color:#fff;font-weight:900">Send Diamonds to Seller</button>
+    <div id="wdMsg" style="margin-top:9px;font-size:12px;opacity:.8"></div>
+  </div>
+
+  <div style="margin-top:15px">
+    <div style="font-size:16px;font-weight:800">Withdrawal History</div>
+    <div id="wdHistory" style="margin-top:7px;font-size:12px"></div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const AKEY='mehar_agency_hosts';
+  const RKEY='mehar_agency_requests';
+  const DKEY='mehar_demo_diamonds';
+  const WKEY='mehar_withdraw_history';
+
+  let hosts=JSON.parse(localStorage.getItem(AKEY)||'[]');
+  let diamonds=parseInt(localStorage.getItem(DKEY)||'0',10);
+  let history=JSON.parse(localStorage.getItem(WKEY)||'[]');
+
+  function fmt(n){return new Intl.NumberFormat('en-US').format(n);}
+  function save(){
+    localStorage.setItem(AKEY,JSON.stringify(hosts));
+    localStorage.setItem(DKEY,String(diamonds));
+    localStorage.setItem(WKEY,JSON.stringify(history));
+  }
+  function render(){
+    document.getElementById('agencyHostCount').textContent=hosts.length+' hosts joined';
+    const box=document.getElementById('agencyHosts');
+    box.innerHTML=hosts.length?hosts.map(h=>'<div style="padding:10px;border-radius:10px;background:rgba(255,255,255,.04);margin-top:6px"><b>'+h+'</b><span style="float:right;color:#7ee0a7">HOST</span></div>').join(''):'<div style="font-size:12px;opacity:.65">No hosts joined yet.</div>';
+    document.getElementById('wdDiamonds').textContent=fmt(diamonds);
+    const hb=document.getElementById('wdHistory');
+    hb.innerHTML=history.length?history.slice().reverse().map(x=>'<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08)">Sent '+fmt(x.amount)+' diamonds → '+x.seller+' · $'+x.usd+' · '+x.time+'</div>').join(''):'<div style="opacity:.65">No withdrawals yet.</div>';
+  }
+
+  document.getElementById('sendAgencyReq').onclick=()=>{
+    const id=document.getElementById('hostIdInput').value.trim();
+    const msg=document.getElementById('agencyOwnerMsg');
+    if(!id){msg.textContent='Enter a Host ID first.';return;}
+    if(hosts.includes(id)){msg.textContent='This host is already in your agency.';return;}
+    const requests=JSON.parse(localStorage.getItem(RKEY)||'[]');
+    requests.push({agency:'Mehar Royal Agency',host:id,time:Date.now()});
+    localStorage.setItem(RKEY,JSON.stringify(requests));
+    msg.textContent='Agency request sent to Host ID '+id+'.';
+    document.getElementById('hostIdInput').value='';
+  };
+
+  document.getElementById('withdrawBtn').onclick=()=>{
+    const seller=document.getElementById('sellerSelect').value;
+    const amount=parseInt(document.getElementById('wdAmount').value||'0',10);
+    const msg=document.getElementById('wdMsg');
+    if(!seller){msg.textContent='Select a Coin Seller ID.';return;}
+    if(!amount || amount<1){msg.textContent='Enter a valid diamond amount.';return;}
+    if(amount>diamonds){msg.textContent='Not enough diamonds.';return;}
+    const usd=(amount/2000000).toFixed(2);
+    diamonds-=amount;
+    history.push({amount,seller,usd,time:new Date().toLocaleString()});
+    save();
+    msg.textContent='Withdrawal request sent to '+seller+'. Value: $'+usd;
+    document.getElementById('wdAmount').value='';
+    render();
+  };
+  render();
+})();
+</script>
+
+
+<section id="profileVipSystem" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#17130d,#111522);border:1px solid #725c2c;color:#fff">
+  <div style="font-size:21px;font-weight:900">Profile & VIP Center</div>
+  <div style="font-size:12px;opacity:.7">Profile frame, VIP level and public ranking</div>
+
+  <div style="margin-top:14px;padding:16px;border-radius:15px;background:rgba(255,255,255,.05);text-align:center">
+    <div id="profileFrame" style="width:96px;height:96px;margin:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;border:5px solid #d9a72c;box-shadow:0 0 20px rgba(217,167,44,.35)">
+      <div style="font-size:34px">👤</div>
+    </div>
+    <div id="profileVipLabel" style="margin-top:8px;font-weight:900;color:#ffd76a">VIP 1</div>
+    <div style="font-size:18px;font-weight:900;margin-top:3px">Mehar Host</div>
+    <div style="font-size:11px;opacity:.65">Host ID: MEHAR1001</div>
+  </div>
+
+  <div style="margin-top:15px;font-size:17px;font-weight:800">VIP Levels</div>
+  <div id="vipList" style="display:grid;gap:7px;margin-top:8px"></div>
+
+  <div style="margin-top:17px;border-top:1px solid rgba(255,255,255,.1);padding-top:14px">
+    <div style="font-size:18px;font-weight:900">🏆 Ranking</div>
+    <div id="rankList" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const VKEY='mehar_vip_level';
+  let vip=parseInt(localStorage.getItem(VKEY)||'1',10);
+  const levels=[
+    {n:1,p:'$10',c:'#d9a72c',desc:'Premium Gold'},
+    {n:2,p:'$20',c:'#b89a35',desc:'Gold + Purple'},
+    {n:3,p:'$30',c:'#9a67d8',desc:'Royal Crown'},
+    {n:4,p:'$40',c:'#e6d58b',desc:'Diamond Gold'},
+    {n:5,p:'$59',c:'#f0c45c',desc:'Ultra Royal'}
+  ];
+
+  function render(){
+    const list=document.getElementById('vipList');
+    list.innerHTML=levels.map(x=>'<button data-vip="'+x.n+'" style="text-align:left;padding:11px;border-radius:11px;border:1px solid '+x.c+';background:'+(vip===x.n?'rgba(217,167,44,.15)':'rgba(255,255,255,.04)')+';color:#fff">'+
+      '<b>VIP '+x.n+'</b> · '+x.p+' <span style="opacity:.65">— '+x.desc+'</span></button>').join('');
+    const level=levels[vip-1];
+    document.getElementById('profileFrame').style.borderColor=level.c;
+    document.getElementById('profileFrame').style.boxShadow='0 0 20px '+level.c;
+    document.getElementById('profileVipLabel').textContent='VIP '+vip;
+    document.getElementById('profileVipLabel').style.color=level.c;
+
+    const ranks=[
+      ['🥇','King','12.8M'],
+      ['🥈','Mehar Host','10.4M'],
+      ['🥉','Riya','8.9M'],
+      ['4','Dark','7.6M'],
+      ['5','Saif','6.3M']
+    ];
+    document.getElementById('rankList').innerHTML=ranks.map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);margin-top:6px"><span style="width:28px;font-weight:900">'+r[0]+'</span><b style="flex:1">'+r[1]+'</b><span style="opacity:.75">'+r[2]+' coins</span></div>').join('');
+  }
+
+  document.getElementById('vipList').addEventListener('click',e=>{
+    const n=e.target.dataset.vip;
+    if(!n)return;
+    vip=parseInt(n,10);
+    localStorage.setItem(VKEY,String(vip));
+    render();
+  });
+  render();
+})();
+</script>
+
+
+<section id="roleManagementSystem" style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#11151d,#17110e);border:1px solid #625332;color:#fff">
+  <div style="font-size:21px;font-weight:900">Manager & Admin Center</div>
+  <div style="font-size:12px;opacity:.7">Server-backed role assignment</div>
+  <div style="margin-top:14px;padding:12px;border-radius:12px;background:rgba(255,255,255,.05)">
+    <b>My Account</b><div id="roleMyId" style="margin-top:5px;font-size:12px;opacity:.75">Login required</div>
+  </div>
+  <div style="margin-top:15px;font-size:17px;font-weight:900">Assign Role</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <input id="roleUserId" placeholder="Enter User ID" style="flex:1;min-width:160px;padding:11px;border-radius:10px;border:1px solid #444;background:#101016;color:#fff">
+    <select id="roleSelect" style="padding:11px;border-radius:10px;background:#101016;color:#fff;border:1px solid #444">
+      <option value="manager">Manager</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option>
+    </select>
+    <button id="assignRole" style="padding:11px 14px;border:0;border-radius:10px;background:#d9a72c;color:#111;font-weight:900">Assign</button>
+  </div>
+  <div id="roleMessage" style="margin-top:9px;font-size:12px;opacity:.8">Role assignment will be saved on the server.</div>
+  <div style="margin-top:16px;padding:12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:12px;opacity:.75">
+    <b>Roles:</b> Manager · Admin · Super Admin<br>Assignment is recorded in the backend database.
+  </div>
+</section>
+<script>
+(function(){
+  const idEl=document.getElementById('roleMyId'),msg=document.getElementById('roleMessage'),input=document.getElementById('roleUserId');
+  function refresh(){const s=window.meharBackend?.state;if(s?.user){idEl.textContent='User ID: '+s.user.id+' · '+s.user.name; if(!input.value)input.value=s.user.id;}else{idEl.textContent='Login required';}}
+  document.getElementById('assignRole').onclick=async()=>{
+    const s=window.meharBackend?.state,id=input.value.trim(),role=document.getElementById('roleSelect').value;
+    if(!s?.token){msg.textContent='Please login to the server first.';window.meharBackend?.showAuth();return;}
+    if(!id){msg.textContent='Enter a User ID first.';return;}
+    try{msg.textContent='Saving role on server...';const d=await s && window.meharBackend.api('/admin/roles',{method:'POST',body:JSON.stringify({userId:id,role})});msg.textContent=d.message+' · '+role.toUpperCase()+' assigned to '+id+'.';}
+    catch(e){msg.textContent='Role assignment failed: '+e.message;}
+  };
+  window.addEventListener('load',()=>setTimeout(refresh,500));setTimeout(refresh,1000);
+})();
+</script>
+
+
+<section style="margin-top:18px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#10141e,#17100e);border:1px solid #665a3a;color:#fff">
+<div style="font-size:21px;font-weight:900">Mehar Live Account</div>
+<div style="font-size:12px;opacity:.7">Login & registration</div>
+<div id="authOut">
+<div style="display:flex;gap:8px;margin-top:13px">
+<button id="lt" style="flex:1;padding:10px;border:0;border-radius:9px;background:#d9a72c;color:#111;font-weight:900">Login</button>
+<button id="rt" style="flex:1;padding:10px;border:0;border-radius:9px;background:#333;color:#fff">Register</button>
+</div>
+<input id="an" placeholder="Username" style="width:100%;box-sizing:border-box;margin-top:9px;padding:11px">
+<input id="ap" placeholder="Phone / Email" style="width:100%;box-sizing:border-box;margin-top:8px;padding:11px">
+<input id="aw" type="password" placeholder="Password" style="width:100%;box-sizing:border-box;margin-top:8px;padding:11px">
+<button id="as" style="width:100%;margin-top:9px;padding:12px;border:0;border-radius:10px;background:#d9a72c;font-weight:900">Login</button>
+<div id="am" style="margin-top:9px;font-size:12px"></div>
+</div>
+<div id="authIn" style="display:none">
+<div id="au" style="margin-top:13px;font-size:19px;font-weight:900"></div>
+<div id="aid" style="font-size:12px;opacity:.7"></div>
+<button id="lo" style="margin-top:10px;padding:10px 14px;border:0;border-radius:9px;background:#333;color:#fff">Logout</button>
+</div>
+</section>
+<script>
+(()=>{let mode='login';const U='mehar_users',S='mehar_session';
+const users=()=>JSON.parse(localStorage.getItem(U)||'[]');
+function render(){let s=JSON.parse(localStorage.getItem(S)||'null');authOut.style.display=s?'none':'block';authIn.style.display=s?'block':'none';if(s){au.textContent=s.name;aid.textContent='User ID: '+s.id+' · Role: '+s.role}}
+lt.onclick=()=>{mode='login';as.textContent='Login'};rt.onclick=()=>{mode='register';as.textContent='Create Account'};
+as.onclick=()=>{let n=an.value.trim(),p=ap.value.trim(),w=aw.value,m=am;if(!n||!p||!w){m.textContent='Fill all fields.';return}let u=users();if(mode==='register'){if(u.some(x=>x.p===p)){m.textContent='Account already exists.';return}let a={id:'MEH'+Date.now().toString().slice(-7),name:n,p,role:'USER'};u.push(a);localStorage.setItem(U,JSON.stringify(u));localStorage.setItem(S,JSON.stringify(a));m.textContent='Account created.'}else{let a=u.find(x=>x.p===p&&x.w===w);if(!a){m.textContent='Invalid login details.';return}localStorage.setItem(S,JSON.stringify(a));m.textContent='Login successful.'}render()};
+lo.onclick=()=>{localStorage.removeItem(S);render()};render()})()
+</script>
+</body></html>
+<script>
+/* MEHAR LIVE — server-backed Agency + Host Center + Withdrawal */
+(function(){
+  function B(){return window.meharBackend;}
+  function state(){return B()?.state;}
+  function fmt(n){return Number(n||0).toLocaleString('en-US');}
+  async function refreshMe(){
+    if(!state()?.token)return null;
+    const d=await B().api('/me');
+    B().state.user=d;
+    B().state.wallet={coins:Number(d.coins||0),diamonds:Number(d.diamonds||0)};
+    localStorage.setItem('mehar_live_api_user',JSON.stringify(d));
+    if(typeof B().refresh==='function') await B().refresh();
+    return d;
+  }
+  async function renderServerAgency(){
+    const st=state();
+    if(!st?.token)return;
+    try{
+      const me=await B().api('/me');
+      st.user=me; st.wallet={coins:Number(me.coins||0),diamonds:Number(me.diamonds||0)};
+      const requests=await B().api('/agencies/requests');
+      const agencyName=me.agencyId?'Agency joined · '+me.agencyId:'Not joined to an agency';
+      const name=document.getElementById('agencyName'); if(name)name.textContent=agencyName;
+      const badge=document.getElementById('agencyBadge');
+      if(badge){badge.textContent=me.agencyId?'AGENCY JOINED':'NO AGENCY';badge.style.background=me.agencyId?'#17452f':'#3d2b18';badge.style.color=me.agencyId?'#8af0b8':'#ffd27a';}
+      const status=document.getElementById('earningStatus'); if(status){status.textContent=me.agencyId?'Earning Active':'Agency required';status.style.color=me.agencyId?'#74e0a8':'#ffd27a';}
+      const note=document.getElementById('earningNote'); if(note)note.textContent=me.agencyId?'Server agency membership is active for this account.':'Join an agency to activate host earning.';
+      const hd=document.getElementById('hostDiamonds'); if(hd)hd.textContent=fmt(me.diamonds);
+      const box=document.getElementById('agencyRequests');
+      if(box){
+        const pending=requests.filter(r=>r.hostId===me.id&&r.status==='pending');
+        box.innerHTML=pending.length?pending.map(r=>`<div style="padding:12px;border-radius:13px;background:rgba(255,255,255,.05);margin-top:7px"><div style="font-weight:900">Agency Owner: ${r.agencyOwnerId}</div><div style="font-size:12px;opacity:.7;margin-top:3px">Server agency request · ${r.id}</div><div style="margin-top:9px"><button data-server-accept="${r.id}" style="padding:8px 11px;border:0;border-radius:8px;background:#38a169;color:white;font-weight:800">Agree</button><button data-server-reject="${r.id}" style="padding:8px 11px;border:0;border-radius:8px;background:#333;color:white;font-weight:800;margin-left:6px">Reject</button></div></div>`).join(''):'<div style="padding:12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:12px;opacity:.7">No pending agency requests.</div>';
+      }
+      const od=document.getElementById('wdDiamonds'); if(od)od.textContent=fmt(me.diamonds);
+      const hist=await B().api('/withdrawals');
+      const hb=document.getElementById('wdHistory');
+      if(hb)hb.innerHTML=hist.length?hist.slice().reverse().map(x=>`<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08)">Sent ${fmt(x.diamonds)} diamonds → ${x.sellerId} · pending · ${new Date(x.createdAt).toLocaleString()}</div>`).join(''):'<div style="opacity:.65">No withdrawals yet.</div>';
+      const hostsBox=document.getElementById('agencyHosts');
+      const count=document.getElementById('agencyHostCount');
+      if(hostsBox||count){
+        const accepted=requests.filter(r=>r.agencyOwnerId===me.id&&r.status==='accepted');
+        if(count)count.textContent=accepted.length+' hosts joined';
+        if(hostsBox)hostsBox.innerHTML=accepted.length?accepted.map(r=>`<div style="padding:10px;border-radius:10px;background:rgba(255,255,255,.04);margin-top:6px"><b>${r.hostId}</b><span style="float:right;color:#7ee0a7">HOST</span></div>`).join(''):'<div style="font-size:12px;opacity:.65">No hosts joined yet.</div>';
+      }
+    }catch(e){
+      console.warn('Server agency refresh:',e.message);
+    }
+  }
+  async function serverAccept(id){
+    try{await B().api('/agencies/requests/'+encodeURIComponent(id)+'/accept',{method:'POST'});await refreshMe();await renderServerAgency();alert('Agency request accepted. You joined the agency.');}
+    catch(e){alert(e.message)}
+  }
+  async function serverReject(id){
+    try{await B().api('/agencies/requests/'+encodeURIComponent(id)+'/reject',{method:'POST'});await renderServerAgency();alert('Agency request rejected.');}
+    catch(e){alert(e.message)}
+  }
+  document.addEventListener('click',e=>{
+    const a=e.target.closest('[data-server-accept]'); if(a){serverAccept(a.dataset.serverAccept);return;}
+    const r=e.target.closest('[data-server-reject]'); if(r){serverReject(r.dataset.serverReject);return;}
+  });
+  function hook(){
+    const send=document.getElementById('sendAgencyReq');
+    if(send)send.onclick=async()=>{
+      const st=state(), id=document.getElementById('hostIdInput')?.value.trim(), msg=document.getElementById('agencyOwnerMsg');
+      if(!st?.token){B().showAuth();return;}
+      if(!id){if(msg)msg.textContent='Enter a Host ID first.';return;}
+      try{await B().api('/agencies/requests',{method:'POST',body:JSON.stringify({hostId:id})});if(msg)msg.textContent='Server agency request sent to Host ID '+id+'.';document.getElementById('hostIdInput').value='';await renderServerAgency();}
+      catch(e){if(msg)msg.textContent=e.message;}
+    };
+    const wd=document.getElementById('withdrawBtn');
+    if(wd)wd.onclick=async()=>{
+      const st=state(), seller=document.getElementById('sellerSelect')?.value, amount=Number(document.getElementById('wdAmount')?.value||0), msg=document.getElementById('wdMsg');
+      if(!st?.token){B().showAuth();return;}
+      if(!seller){if(msg)msg.textContent='Select a Coin Seller ID.';return;}
+      if(!Number.isInteger(amount)||amount<1){if(msg)msg.textContent='Enter a valid diamond amount.';return;}
+      if(amount>Number(st.wallet.diamonds||0)){if(msg)msg.textContent='Not enough diamonds.';return;}
+      try{const out=await B().api('/withdrawals',{method:'POST',body:JSON.stringify({sellerId:seller,diamonds:amount})});await refreshMe();if(msg)msg.textContent='Withdrawal request created successfully. Remaining diamonds: '+fmt(out.diamondsRemaining);document.getElementById('wdAmount').value='';await renderServerAgency();}
+      catch(e){if(msg)msg.textContent=e.message;}
+    };
+    const demo=document.getElementById('demoRequest');
+    if(demo)demo.onclick=async()=>{const msg=document.getElementById('agencyMessage');if(!state()?.token){B().showAuth();return;}if(msg)msg.textContent='Demo request is disabled — use Agency Owner Center to send a real server request.';};
+    const leave=document.getElementById('leaveAgency');
+    if(leave)leave.onclick=()=>{const msg=document.getElementById('agencyMessage');if(msg)msg.textContent='Agency leaving is not yet available in v15 backend. Membership is controlled by accepted server requests.';};
+  }
+  window.addEventListener('load',()=>{hook();setTimeout(renderServerAgency,600);});
+  setInterval(()=>{if(state()?.token)renderServerAgency();},5000);
+})();
+</script>
+
+<script>
+/* MEHAR LIVE — real backend connection layer */
+(function(){
+  const API='http://127.0.0.1:3000/api';
+  const TOKEN_KEY='mehar_live_api_token';
+  const USER_KEY='mehar_live_api_user';
+  const state={token:localStorage.getItem(TOKEN_KEY)||'',user:null,wallet:{coins:0,diamonds:0}};
+  try{state.user=JSON.parse(localStorage.getItem(USER_KEY)||'null')}catch(e){}
+  async function api(path,options={}){
+    const headers={'Content-Type':'application/json',...(options.headers||{})};
+    if(state.token) headers.Authorization='Bearer '+state.token;
+    const r=await fetch(API+path,{...options,headers});
+    let data={}; try{data=await r.json()}catch(e){}
+    if(!r.ok) throw new Error(data.error||'Request failed');
+    return data;
+  }
+  async function sync(){
+    if(!state.token)return null;
+    const d=await api('/me'); state.user=d; state.wallet={coins:Number(d.coins||0),diamonds:Number(d.diamonds||0)};
+    localStorage.setItem(USER_KEY,JSON.stringify(state.user));
+    return d;
+  }
+  function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+  function showAuth(){
+    let old=document.getElementById('meharBackendAuth'); if(old)old.remove();
+    const d=document.createElement('div'); d.id='meharBackendAuth'; d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px';
+    d.innerHTML=`<div style="width:100%;max-width:390px;background:#0a2419;border:1px solid #d4aa4f;border-radius:20px;padding:20px;color:#fff;box-shadow:0 20px 60px #000"><div style="font-size:25px;font-weight:900;color:#f7d86b">MEHAR LIVE</div><div style="font-size:12px;opacity:.7;margin:4px 0 16px">Server Login</div><input id="beName" placeholder="Username (register only)" style="width:100%;padding:12px;margin:5px 0;border-radius:10px;border:1px solid #506c5b;background:#06140e;color:#fff"><input id="bePhone" placeholder="Phone or Email" style="width:100%;padding:12px;margin:5px 0;border-radius:10px;border:1px solid #506c5b;background:#06140e;color:#fff"><input id="bePass" type="password" placeholder="Password (6+ characters)" style="width:100%;padding:12px;margin:5px 0;border-radius:10px;border:1px solid #506c5b;background:#06140e;color:#fff"><div style="display:flex;gap:8px;margin-top:10px"><button id="beLogin" style="flex:1;padding:12px;border:0;border-radius:10px;background:#d7aa3e;font-weight:900">Login</button><button id="beReg" style="flex:1;padding:12px;border:0;border-radius:10px;background:#1ab477;color:#fff;font-weight:900">Register</button></div><div id="beMsg" style="font-size:12px;margin-top:10px;min-height:18px"></div></div>`;
+    document.body.appendChild(d);
+    const msg=t=>document.getElementById('beMsg').textContent=t;
+    async function run(register){try{msg('Connecting to server...');const body=register?{name:document.getElementById('beName').value,email:document.getElementById('bePhone').value,password:document.getElementById('bePass').value}:{email:document.getElementById('bePhone').value,password:document.getElementById('bePass').value};const out=await api(register?'/auth/register':'/auth/login',{method:'POST',body:JSON.stringify(body)});state.token=out.token;state.user=out.user;state.wallet={coins:Number(out.user?.coins||0),diamonds:Number(out.user?.diamonds||0)};localStorage.setItem(TOKEN_KEY,state.token);localStorage.setItem(USER_KEY,JSON.stringify(state.user));d.remove();updateBackendBar();alert(register?'Account created and saved on server.':'Login successful.');}catch(e){msg(e.message)}}
+    document.getElementById('beLogin').onclick=()=>run(false);document.getElementById('beReg').onclick=()=>run(true);
+  }
+  function updateBackendBar(){
+    let b=document.getElementById('meharBackendBar'); if(!b){b=document.createElement('div');b.id='meharBackendBar';b.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9998;max-width:410px;width:calc(100% - 18px);padding:8px 10px;border:1px solid #b99547;border-radius:12px;background:#071b12;color:#fff;font-size:11px;display:flex;justify-content:space-between;align-items:center;gap:8px';document.body.appendChild(b)}
+    b.innerHTML=state.user?`<span>🟢 Server: <b>${esc(state.user.name)}</b> · ID ${state.user.id} · 🪙 ${Number(state.wallet.coins||0).toLocaleString()} · 💎 ${Number(state.wallet.diamonds||0).toLocaleString()}</span><button id="beOut" style="border:0;border-radius:8px;padding:5px 8px;background:#5a302b;color:#fff">Logout</button>`:`<span>🔴 Not logged in</span><button id="beIn" style="border:0;border-radius:8px;padding:5px 8px;background:#d7aa3e">Login</button>`;
+    const inb=document.getElementById('beIn');if(inb)inb.onclick=showAuth;const out=document.getElementById('beOut');if(out)out.onclick=()=>{state.token='';state.user=null;state.wallet={coins:0,diamonds:0};localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);updateBackendBar();};
+  }
+  window.meharBackend={api,sync,showAuth,state,refresh:async()=>{try{await sync();updateBackendBar()}catch(e){state.token='';localStorage.removeItem(TOKEN_KEY);updateBackendBar()}}};
+  window.addEventListener('load',async()=>{try{await sync()}catch(e){state.token='';localStorage.removeItem(TOKEN_KEY)}updateBackendBar();});
+})();
+</script>
+<script>
+(function(){
+  const oldSendGift=window.sendGift;
+  window.sendGift=async function(name,cost){
+    if(!window.meharBackend.state.token){window.meharBackend.showAuth();return;}
+    try{const d=await window.meharBackend.api('/gifts/send',{method:'POST',body:JSON.stringify({gift:name,coins:Number(cost),diamonds:Number(cost)})});window.meharBackend.state.wallet={coins:Number(d.coins||0),diamonds:Number(d.diamonds||0)};document.getElementById('meharBackendBar')?.querySelector('span')?.replaceWith((()=>{const s=document.createElement('span');const u=window.meharBackend.state.user,w=window.meharBackend.state.wallet;s.innerHTML=`🟢 Server: <b>${u.name}</b> · ID ${u.id} · 🪙 ${Number(w.coins).toLocaleString()} · 💎 ${Number(w.diamonds).toLocaleString()}`;return s})());if(typeof closeGifts==='function')closeGifts();const f=document.getElementById('feed');if(f)f.insertAdjacentHTML('afterbegin',`<div class="giftEvent">🎁 <b>You sent ${name}</b> — 🪙 ${Number(cost).toLocaleString()} coins · 💎 +${Number(cost).toLocaleString()}</div>`);}catch(e){alert(e.message)}
+  };
+})();
+</script>
