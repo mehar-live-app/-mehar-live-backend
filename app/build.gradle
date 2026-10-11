@@ -1,10 +1,10 @@
-
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
 }
 
 android {
+    namespace 'com.mehar.live'
     compileSdk 33
     defaultConfig {
         applicationId "com.mehar.live"
@@ -21,7 +21,6 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'
 }
-namespace 'com.meharlive.app'
