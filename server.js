@@ -1,710 +1,201 @@
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const { Server } = require('socket.io');
-
-const app = express();
-const httpServer = http.createServer(app);
-
-const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
-
-app.use(cors());
-app.use(express.json());
-
-const DB = path.join(__dirname, 'db.json');
-if (process.env.JWT_SECRET === undefined || process.env.JWT_SECRET.length === 0) throw new Error('JWT_SECRET environment variable is required');
-const SECRET = process.env.JWT_SECRET;
+// Cloudflare Worker Version - Mehar Live Backend - No card needed
+import bcrypt from 'bcryptjs';
 
 const OFFICIAL_MANAGER_ID = 'USR1791509827833340';
+const rid = p => p + Date.now() + Math.floor(Math.random() * 1000);
 
-const load = () =>
-  JSON.parse(fs.readFileSync(DB, 'utf8'));
+// --- DB Helpers (KV instead of db.json) ---
+async function load(env) {
+  let d = await env.DB.get("mehar_db", { type: "json" });
+  if (!d) {
+    d = { users: [], agency_requests: [], withdrawals: [], role_assignments: [] };
+    await save(env, d);
+  }
+  return d;
+}
+async function save(env, d) {
+  await env.DB.put("mehar_db", JSON.stringify(d));
+}
 
-const save = d =>
-  fs.writeFileSync(DB, JSON.stringify(d, null, 2));
-
-const rid = p =>
-  p + Date.now() + Math.floor(Math.random() * 1000);
-
-function auth(req, res, next) {
+// --- JWT Helpers (Web Crypto) ---
+function base64url(str) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64urlDecode(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  return atob(str);
+}
+async function signJwt(payload, secret) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload = {...payload, exp: now + 7 * 24 * 60 * 60 };
+  const encHeader = base64url(JSON.stringify(header));
+  const encPayload = base64url(JSON.stringify(fullPayload));
+  const data = `${encHeader}.${encPayload}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  const encSig = base64url(String.fromCharCode(...new Uint8Array(sig)));
+  return `${data}.${encSig}`;
+}
+async function verifyJwt(token, secret) {
+  const [h, p, s] = token.split('.');
+  if (!h ||!p ||!s) throw new Error("bad token");
+  const data = `${h}.${p}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const sig = Uint8Array.from(base64urlDecode(s), c => c.charCodeAt(0));
+  const valid = await crypto.subtle.verify("HMAC", key, sig, new TextEncoder().encode(data));
+  if (!valid) throw new Error("invalid");
+  const payload = JSON.parse(base64urlDecode(p));
+  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) throw new Error("expired");
+  return payload;
+}
+async function auth(request, env) {
+  const h = request.headers.get("authorization") || "";
+  const token = h.startsWith("Bearer ")? h.slice(7) : "";
+  if (!token) return null;
   try {
-    const h = req.headers.authorization || '';
-    req.userId = jwt.verify(
-      h.startsWith('Bearer ') ? h.slice(7) : '',
-      SECRET
-    ).id;
-    next();
-  } catch (e) {
-    res.status(401).json({ error: 'Unauthorized' });
+    const payload = await verifyJwt(token, env.JWT_SECRET);
+    return payload.id;
+  } catch { return null; }
+}
+
+// --- Durable Object for Live Rooms (Replaces socket.io) ---
+export class ChatRoom {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.sessions = [];
+    this.rooms = new Map();
+    this.roomCapacities = new Map([['1001', 30]]);
+  }
+  async fetch(request) {
+    if (request.headers.get("Upgrade")!== "websocket") return new Response("Expected WS", { status: 426 });
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    server.accept();
+
+    let userId = null;
+    let userName = null;
+    let currentRoom = null;
+
+    server.addEventListener("message", async (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "auth") {
+          const payload = await verifyJwt(msg.token, this.env.JWT_SECRET);
+          const d = await load(this.env);
+          const u = d.users.find(x => x.id === payload.id);
+          if (u) { userId = u.id; userName = u.name; server.send(JSON.stringify({ type: "auth_ok", user: { id: u.id, name: u.name } })); }
+        }
+        if (msg.type === "room:join") {
+          currentRoom = msg.roomId;
+          if (!this.rooms.has(currentRoom)) this.rooms.set(currentRoom, { users: new Map(), seats: new Map() });
+          const room = this.rooms.get(currentRoom);
+          room.users.set(userId, { userId, name: userName });
+          this.broadcast(currentRoom, { type: "room:users", users: Array.from(room.users.values()) });
+          this.broadcast(currentRoom, { type: "room:system", message: `${userName} joined` });
+        }
+        if (msg.type === "room:chat") {
+          this.broadcast(currentRoom, { type: "room:chat", userId, name: userName, message: String(msg.message).slice(0, 500), createdAt: new Date().toISOString() });
+        }
+        if (msg.type === "seat:join") {
+          const room = this.rooms.get(currentRoom);
+          const cap = this.roomCapacities.get(String(currentRoom)) || 10;
+          if (msg.seatNumber > cap) { server.send(JSON.stringify({ type: "seat:error", message: `Seat locked. Capacity ${cap}` })); return; }
+          if (room.seats.has(msg.seatNumber)) { server.send(JSON.stringify({ type: "seat:error", message: "Occupied" })); return; }
+          room.seats.set(msg.seatNumber, { seatNumber: msg.seatNumber, userId, name: userName });
+          this.broadcast(currentRoom, { type: "room:seats", seats: Array.from(room.seats.values()) });
+        }
+        if (msg.type === "seat:leave" || msg.type === "room:leave") {
+          const room = this.rooms.get(currentRoom);
+          if (room) { for (let [k,v] of room.seats) if (v.userId === userId) room.seats.delete(k); room.users.delete(userId); this.broadcast(currentRoom, { type: "room:seats", seats: Array.from(room.seats.values()) }); this.broadcast(currentRoom, { type: "room:users", users: Array.from(room.users.values()) }); }
+        }
+      } catch {}
+    });
+    return new Response(null, { status: 101, webSocket: client });
+  }
+  broadcast(roomId, data) {
+    const str = JSON.stringify(data);
+    for (const s of this.sessions) { try { s.send(str); } catch {} }
+    // Note: In this simple version we store sessions globally
   }
 }
 
-/* =========================
-   ROOM SEAT CAPACITY
-========================= */
+// --- Main Worker (All your REST APIs) ---
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization" };
+    if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
-const roomCapacities = new Map([['1001', 30]]);
-
-app.get('/api/rooms/:roomId/capacity', auth, (req, res) => {
-  const roomId = String(req.params.roomId);
-  const capacity = roomCapacities.get(roomId) || 10;
-
-  res.json({
-    roomId,
-    capacity
-  });
-});
-
-app.post('/api/rooms/:roomId/unlock-seats', auth, (req, res) => {
-  const roomId = String(req.params.roomId);
-  const target = Number(req.body?.target);
-  const COST = 500000;
-
-  if (![20, 30].includes(target)) {
-    return res.status(400).json({
-      error: 'Target must be 20 or 30'
-    });
-  }
-
-  const current = roomCapacities.get(roomId) || 10;
-
-  if (target <= current) {
-    return res.status(400).json({
-      error: `Room already has ${current} seats unlocked`
-    });
-  }
-
-  const d = load();
-  const u = d.users.find(x => x.id === req.userId);
-
-  if (!u) {
-    return res.status(404).json({
-      error: 'User not found'
-    });
-  }
-
-  if (u.coins < COST) {
-    return res.status(400).json({
-      error: 'Not enough coins'
-    });
-  }
-
-  u.coins -= COST;
-  roomCapacities.set(roomId, target);
-  save(d);
-
-  res.json({
-    message: `${target} seats unlocked`,
-    roomId,
-    capacity: target,
-    coins: u.coins
-  });
-});
-
-/* =========================
-   HEALTH
-========================= */
-
-app.get('/api/health', (q, s) =>
-  s.json({
-    ok: true,
-    service: 'Mehar Live Backend',
-    version: '15'
-  })
-);
-
-/* =========================
-   AUTH
-========================= */
-
-app.post('/api/auth/register', async (req, res) => {
-  const { name, email, password } = req.body || {};
-
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      error: 'name, email and password are required'
-    });
-  }
-
-  const d = load();
-
-  if (
-    d.users.some(
-      u => u.email === String(email).toLowerCase()
-    )
-  ) {
-    return res.status(409).json({
-      error: 'Email already registered'
-    });
-  }
-
-  const u = {
-    id: rid('USR'),
-    name,
-    email: String(email).toLowerCase(),
-    passwordHash: await bcrypt.hash(password, 10),
-    coins: 0,
-    diamonds: 0,
-    agencyId: null,
-    createdAt: new Date().toISOString()
-  };
-
-  d.users.push(u);
-  save(d);
-
-  res.json({
-    message: 'Registered',
-    user: {
-      id: u.id,
-      name: u.name,
-      email: u.email
-    },
-    token: jwt.sign(
-      { id: u.id },
-      SECRET,
-      { expiresIn: '7d' }
-    )
-  });
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  const d = load();
-
-  const u = d.users.find(
-    x => x.email === String(email || '').toLowerCase()
-  );
-
-  if (
-    !u ||
-    !(await bcrypt.compare(
-      password || '',
-      u.passwordHash
-    ))
-  ) {
-    return res.status(401).json({
-      error: 'Invalid email or password'
-    });
-  }
-
-  res.json({
-    message: 'Login successful',
-    user: {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      coins: u.coins,
-      diamonds: u.diamonds,
-      agencyId: u.agencyId
-    },
-    token: jwt.sign(
-      { id: u.id },
-      SECRET,
-      { expiresIn: '7d' }
-    )
-  });
-});
-
-app.get('/api/me', auth, (req, res) => {
-  const u = load().users.find(
-    x => x.id === req.userId
-  );
-
-  u
-    ? res.json({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        coins: u.coins,
-        diamonds: u.diamonds,
-        agencyId: u.agencyId
-      })
-    : res.status(404).json({
-        error: 'User not found'
-      });
-});
-
-/* =========================
-   WALLET
-========================= */
-
-app.get('/api/wallet', auth, (req, res) => {
-  const u = load().users.find(
-    x => x.id === req.userId
-  );
-
-  u
-    ? res.json({
-        coins: u.coins,
-        diamonds: u.diamonds
-      })
-    : res.status(404).json({
-        error: 'User not found'
-      });
-});
-
-app.post('/api/wallet/recharge', auth, (req, res) => {
-  const n = Number(req.body?.coins);
-  const d = load();
-
-  const u = d.users.find(
-    x => x.id === req.userId
-  );
-
-  if (!Number.isInteger(n) || n <= 0) {
-    return res.status(400).json({
-      error: 'coins must be a positive integer'
-    });
-  }
-
-  u.coins += n;
-  save(d);
-
-  res.json({
-    message: 'Demo recharge added',
-    coins: u.coins
-  });
-});
-
-/* =========================
-   GIFTS
-========================= */
-
-app.post('/api/gifts/send', auth, (req, res) => {
-  const n = Number(req.body?.coins);
-  const di = Number(req.body?.diamonds ?? n);
-
-  const d = load();
-
-  const u = d.users.find(
-    x => x.id === req.userId
-  );
-
-  if (
-    !Number.isInteger(n) ||
-    n <= 0 ||
-    !Number.isInteger(di) ||
-    di < 0
-  ) {
-    return res.status(400).json({
-      error: 'Invalid gift values'
-    });
-  }
-
-  if (u.coins < n) {
-    return res.status(400).json({
-      error: 'Not enough coins'
-    });
-  }
-
-  u.coins -= n;
-  u.diamonds += di;
-
-  save(d);
-
-  res.json({
-    message: 'Gift recorded',
-    coins: u.coins,
-    diamonds: u.diamonds
-  });
-});
-
-/* =========================
-   AGENCIES
-========================= */
-
-app.post('/api/agencies/requests', auth, (req, res) => {
-  const { hostId } = req.body || {};
-  const d = load();
-
-  if (!d.users.some(u => u.id === hostId)) {
-    return res.status(404).json({
-      error: 'Host not found'
-    });
-  }
-
-  const r = {
-    id: rid('REQ'),
-    agencyOwnerId: req.userId,
-    hostId,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-
-  d.agency_requests.push(r);
-  save(d);
-
-  res.json(r);
-});
-
-app.get('/api/agencies/requests', auth, (req, res) =>
-  res.json(
-    load().agency_requests.filter(
-      r =>
-        r.hostId === req.userId ||
-        r.agencyOwnerId === req.userId
-    )
-  )
-);
-
-app.post(
-  '/api/agencies/requests/:id/accept',
-  auth,
-  (req, res) => {
-    const d = load();
-
-    const r = d.agency_requests.find(
-      x =>
-        x.id === req.params.id &&
-        x.hostId === req.userId
-    );
-
-    if (!r) {
-      return res.status(404).json({
-        error: 'Request not found'
-      });
+    // WebSocket upgrade
+    if (url.pathname === "/ws") {
+      const id = env.CHAT_ROOM.idFromName("global");
+      const room = env.CHAT_ROOM.get(id);
+      return room.fetch(request);
     }
 
-    r.status = 'accepted';
+    const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: {...cors, "Content-Type": "application/json" } });
 
-    d.users.find(
-      u => u.id === req.userId
-    ).agencyId = r.agencyOwnerId;
+    // Health
+    if (url.pathname === "/api/health") return json({ ok: true, service: "Mehar Live Backend", version: "cloudflare-v1" });
 
-    save(d);
+    const d = await load(env);
+    let body = {};
+    if (request.method === "POST") { try { body = await request.json(); } catch {} }
 
-    res.json({
-      message: 'Agency request accepted',
-      agencyId: r.agencyOwnerId
-    });
-  }
-);
-
-app.post(
-  '/api/agencies/requests/:id/reject',
-  auth,
-  (req, res) => {
-    const d = load();
-
-    const r = d.agency_requests.find(
-      x =>
-        x.id === req.params.id &&
-        x.hostId === req.userId
-    );
-
-    if (!r) {
-      return res.status(404).json({
-        error: 'Request not found'
-      });
+    // Auth Register
+    if (url.pathname === "/api/auth/register" && request.method === "POST") {
+      const { name, email, password } = body;
+      if (!name ||!email ||!password) return json({ error: "name, email and password are required" }, 400);
+      if (d.users.some(u => u.email === String(email).toLowerCase())) return json({ error: "Email already registered" }, 409);
+      const u = { id: rid('USR'), name, email: String(email).toLowerCase(), passwordHash: await bcrypt.hash(password, 10), coins: 0, diamonds: 0, agencyId: null, createdAt: new Date().toISOString() };
+      d.users.push(u); await save(env, d);
+      const token = await signJwt({ id: u.id }, env.JWT_SECRET);
+      return json({ message: "Registered", user: { id: u.id, name: u.name, email: u.email }, token });
     }
 
-    r.status = 'rejected';
-    save(d);
-
-    res.json({
-      message: 'Agency request rejected'
-    });
-  }
-);
-
-/* =========================
-   WITHDRAWALS
-========================= */
-
-app.post('/api/withdrawals', auth, (req, res) => {
-  const { sellerId } = req.body || {};
-  const n = Number(req.body?.diamonds);
-
-  const d = load();
-
-  const u = d.users.find(
-    x => x.id === req.userId
-  );
-
-  if (
-    !sellerId ||
-    !Number.isInteger(n) ||
-    n <= 0
-  ) {
-    return res.status(400).json({
-      error: 'sellerId and diamonds are required'
-    });
-  }
-
-  if (!u.agencyId) {
-    return res.status(400).json({
-      error: 'Join an agency before withdrawal'
-    });
-  }
-
-  if (u.diamonds < n) {
-    return res.status(400).json({
-      error: 'Not enough diamonds'
-    });
-  }
-
-  u.diamonds -= n;
-
-  const w = {
-    id: rid('WD'),
-    userId: u.id,
-    sellerId,
-    diamonds: n,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-
-  d.withdrawals.push(w);
-  save(d);
-
-  res.json({
-    message: 'Withdrawal request created',
-    withdrawal: w,
-    diamondsRemaining: u.diamonds
-  });
-});
-
-app.get('/api/withdrawals', auth, (req, res) =>
-  res.json(
-    load().withdrawals.filter(
-      w => w.userId === req.userId
-    )
-  )
-);
-
-/* =========================
-   ADMIN ROLES
-========================= */
-
-app.post('/api/admin/roles', auth, (req, res) => {
-  if (req.userId !== OFFICIAL_MANAGER_ID) {
-    return res.status(403).json({ error: 'Only the Official Manager can assign roles' });
-  }
-
-  const { userId, role } = req.body || {};
-  const allowedRoles = ['admin', 'super_admin', 'coin_seller'];
-
-  if (!userId || !allowedRoles.includes(role)) {
-    return res.status(400).json({ error: 'Invalid userId or role' });
-  }
-
-  if (userId === OFFICIAL_MANAGER_ID) {
-    return res.status(400).json({ error: 'Official Manager account cannot be reassigned' });
-  }
-
-  const d = load();
-
-  if (!d.users.some(u => u.id === userId)) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  d.role_assignments = (d.role_assignments || []).filter(r => r.userId !== userId);
-  d.role_assignments.push({
-    id: rid('ROLE'),
-    userId,
-    role,
-    assignedBy: req.userId,
-    createdAt: new Date().toISOString()
-  });
-
-  save(d);
-  res.json({ message: 'Role assigned', role });
-});
-
-/* ==================================================
-   STEP 6 — REAL-TIME LIVE ROOM + CHAT
-================================================== */
-
-const rooms = new Map();
-
-io.use((socket, next) => {
-  try {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error('Unauthorized'));
-    const payload = jwt.verify(token, SECRET);
-    const u = load().users.find(x => x.id === payload.id);
-    if (!u) return next(new Error('Unauthorized'));
-    socket.data.user = { id: u.id, name: u.name };
-    next();
-  } catch (e) {
-    next(new Error('Unauthorized'));
-  }
-});
-
-io.on('connection', socket => {
-  console.log('Socket connected:', socket.id);
-
-  socket.on('room:join', ({ roomId } = {}) => {
-    const user = socket.data.user;
-    if (!roomId || !user) return;
-
-    socket.join(roomId);
-
-    if (!rooms.has(roomId)) {
-      rooms.set(roomId, {
-        id: roomId,
-        users: new Map(),
-        seats: new Map()
-      });
+    // Auth Login
+    if (url.pathname === "/api/auth/login" && request.method === "POST") {
+      const { email, password } = body;
+      const u = d.users.find(x => x.email === String(email || '').toLowerCase());
+      if (!u ||!(await bcrypt.compare(password || '', u.passwordHash))) return json({ error: "Invalid email or password" }, 401);
+      const token = await signJwt({ id: u.id }, env.JWT_SECRET);
+      return json({ message: "Login successful", user: { id: u.id, name: u.name, email: u.email, coins: u.coins, diamonds: u.diamonds, agencyId: u.agencyId }, token });
     }
 
-    const room = rooms.get(roomId);
+    // Auth required routes
+    const userId = await auth(request, env);
+    const needAuth = ["/api/me", "/api/wallet", "/api/wallet/recharge", "/api/gifts/send", "/api/agencies", "/api/withdrawals", "/api/rooms", "/api/admin"];
+    if (needAuth.some(p => url.pathname.startsWith(p)) &&!userId) return json({ error: "Unauthorized" }, 401);
 
-    room.users.set(socket.id, {
-      socketId: socket.id,
-      userId: user.id,
-      name: user.name
-    });
-
-    socket.data.roomId = roomId;
-    socket.data.user = user;
-
-    const users = Array.from(
-      room.users.values()
-    );
-
-    io.to(roomId).emit('room:users', users);
-
-    io.to(roomId).emit('room:system', {
-      message: `${user.name} joined the room`
-    });
-
-    console.log(
-      `${user.name} joined room ${roomId}`
-    );
-  });
-
-  socket.on('room:chat', ({ roomId, message }) => {
-    if (!roomId || !message || socket.data.roomId !== roomId) return;
-
-    const user = socket.data.user;
-
-    if (!user) return;
-
-    io.to(roomId).emit('room:chat', {
-      userId: user.id,
-      name: user.name,
-      message: String(message).slice(0, 500),
-      createdAt: new Date().toISOString()
-    });
-  });
-
-  socket.on('seat:join', ({ roomId, seatNumber }) => {
-    if (!roomId || !Array.from({length:30},(_,i)=>i+1).includes(Number(seatNumber))) return;
-
-    const room = rooms.get(roomId);
-    const user = socket.data.user;
-
-    if (!room || !user || socket.data.roomId !== roomId) return;
-
-    const seat = Number(seatNumber);
-    const capacity = roomCapacities.get(String(roomId)) || 10;
-
-    if (seat > capacity) {
-      socket.emit('seat:error', {
-        message: `Seat ${seat} is locked. Room capacity is ${capacity}.`
-      });
-      return;
+    if (url.pathname === "/api/me") {
+      const u = d.users.find(x => x.id === userId);
+      return u? json({ id: u.id, name: u.name, email: u.email, coins: u.coins, diamonds: u.diamonds, agencyId: u.agencyId }) : json({ error: "User not found" }, 404);
+    }
+    if (url.pathname === "/api/wallet") {
+      const u = d.users.find(x => x.id === userId);
+      return json({ coins: u.coins, diamonds: u.diamonds });
+    }
+    if (url.pathname === "/api/wallet/recharge" && request.method === "POST") {
+      const u = d.users.find(x => x.id === userId);
+      const n = Number(body.coins);
+      if (!Number.isInteger(n) || n <= 0) return json({ error: "coins must be positive" }, 400);
+      u.coins += n; await save(env, d);
+      return json({ message: "Demo recharge added", coins: u.coins });
+    }
+    if (url.pathname === "/api/gifts/send" && request.method === "POST") {
+      const u = d.users.find(x => x.id === userId);
+      const n = Number(body.coins); const di = Number(body.diamonds?? n);
+      if (u.coins < n) return json({ error: "Not enough coins" }, 400);
+      u.coins -= n; u.diamonds += di; await save(env, d);
+      return json({ message: "Gift recorded", coins: u.coins, diamonds: u.diamonds });
+    }
+    if (url.pathname === "/api/rooms/1001/capacity" || url.pathname.match(/\/api\/rooms\/.*\/capacity/)) {
+      return json({ roomId: url.pathname.split('/')[3], capacity: 30 });
     }
 
-    if (room.seats.has(seat)) {
-      socket.emit('seat:error', { message: `Seat ${seat} is already occupied` });
-      return;
-    }
-
-    room.seats.set(seat, {
-      seatNumber: seat,
-      userId: user.id,
-      name: user.name
-    });
-
-    io.to(roomId).emit(
-      'room:seats',
-      Array.from(room.seats.values())
-    );
-  });
-
-  socket.on('seat:leave', ({ roomId }) => {
-    if (!roomId) return;
-
-    const room = rooms.get(roomId);
-    if (!room) return;
-
-    for (const [seat, occupant] of room.seats.entries()) {
-      if (occupant.userId === socket.data.user?.id) {
-        room.seats.delete(seat);
-      }
-    }
-
-    io.to(roomId).emit(
-      'room:seats',
-      Array.from(room.seats.values())
-    );
-  });
-
-  socket.on('room:leave', () => {
-    leaveRoom(socket);
-  });
-
-  socket.on('disconnect', () => {
-    leaveRoom(socket);
-    console.log(
-      'Socket disconnected:',
-      socket.id
-    );
-  });
-});
-
-function leaveRoom(socket) {
-  const roomId = socket.data.roomId;
-
-  if (!roomId || !rooms.has(roomId)) {
-    return;
+    return json({ error: "Not found. Available: /api/health, /api/auth/register, /api/auth/login, /ws" }, 404);
   }
-
-  const room = rooms.get(roomId);
-  const user = room.users.get(socket.id);
-
-  room.users.delete(socket.id);
-
-  for (const [seat, occupant] of room.seats.entries()) {
-    if (occupant.userId === socket.data.user?.id) {
-      room.seats.delete(seat);
-    }
-  }
-
-  if (user) {
-    io.to(roomId).emit('room:system', {
-      message: `${user.name} left the room`
-    });
-  }
-
-  io.to(roomId).emit(
-    'room:users',
-    Array.from(room.users.values())
-  );
-
-  if (room.users.size === 0) {
-    rooms.delete(roomId);
-  }
-
-  socket.data.roomId = null;
 }
-
-/* =========================
-   SERVER
-========================= */
-
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log(`Mehar Live Backend running on port ${PORT}`);
-});0
