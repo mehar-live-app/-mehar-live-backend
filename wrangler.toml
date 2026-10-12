@@ -1,0 +1,4 @@
+name = "mehar-live-backend"
+main = "server.js"
+compatibility_date = "2025-10-12"
+compatibility_flags = ["nodejs_compat"]
