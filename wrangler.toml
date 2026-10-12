@@ -1,4 +1,14 @@
 name = "mehar-live-backend"
 main = "server.js"
-compatibility_date = "2025-10-12"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-11-01"
+
+[durable_objects]
+bindings = [{ name = "CHAT_ROOM", class_name = "ChatRoom" }]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatRoom"]
+
+[[kv_namespaces]]
+binding = "DB"
+id = "mehar_db_kv"
